@@ -54,15 +54,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!cancelled) setLoading(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, sess) => {
+    // ⚠️ Keep this callback synchronous — no awaits. `signInWithPassword` (and
+    // friends) internally await the listener chain, so any async work here
+    // creates a deadlock where the signIn promise never resolves even though
+    // the HTTP call has returned 200.
+    // See: https://github.com/supabase/supabase-js/issues/1063
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
       if (cancelled) return;
       setSession(sess);
+      setLoading(false);
       if (sess?.user) {
-        await loadProfile(sess.user.id);
+        // Fire-and-forget — do not await inside this callback.
+        loadProfile(sess.user.id).catch((err) =>
+          console.warn('[auth] loadProfile failed', err)
+        );
       } else {
         setProfile(null);
       }
-      if (!cancelled) setLoading(false);
     });
 
     return () => {
