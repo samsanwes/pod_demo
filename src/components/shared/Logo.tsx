@@ -1,42 +1,41 @@
 import { cn } from '@/lib/utils';
+import logoPrimary from '@/assets/logo/logo-primary.svg';
+import logoWhite from '@/assets/logo/logo-white.svg';
 
 interface LogoProps {
   variant?: 'primary' | 'inverse';
   className?: string;
   showWordmark?: boolean;
+  size?: number;
 }
 
 /**
- * SAIACS brand logo placeholder.
+ * SAIACS brand logo.
  *
- * Drop the real SVG files at `src/assets/logo/logo-primary.svg` and
- * `src/assets/logo/logo-inverse.svg` and swap out the inner JSX here.
+ * Primary = navy (Foundations #1A2549) on light backgrounds.
+ * Inverse = white on dark (Foundations / Traditions) backgrounds.
  *
  * Brand rules enforced:
- *  - Never rotate, stretch, or crop the mark
- *  - Clear space ≥ height of the pillar (left padding on the wordmark)
- *  - Use navy on light backgrounds; white on dark
+ *  - No rotation, stretching, or cropping (we render at a fixed aspect ratio).
+ *  - Clear space ≥ height of the pillar (we pad the wordmark accordingly).
+ *  - No gradients or shadows (no filter classes applied).
  */
-export function Logo({ variant = 'primary', className, showWordmark = true }: LogoProps) {
-  const onLight = variant === 'primary';
-  const markFill = onLight ? '#1A2549' : '#F0F7FA';
-  const textFill = onLight ? '#1A2549' : '#F0F7FA';
+export function Logo({ variant = 'primary', className, showWordmark = true, size = 40 }: LogoProps) {
+  const src = variant === 'primary' ? logoPrimary : logoWhite;
+  const textColor = variant === 'primary' ? '#1A2549' : '#F0F7FA';
 
   return (
-    <div className={cn('inline-flex items-center gap-3', className)} aria-label="SAIACS">
-      {/* Placeholder mark — replace with real SVG */}
-      <svg viewBox="0 0 40 40" className="h-10 w-10 shrink-0" aria-hidden="true">
-        <rect x="8" y="18" width="24" height="16" fill={markFill} />
-        <rect x="10" y="20" width="3" height="12" fill={onLight ? '#F0F7FA' : '#1A2549'} />
-        <rect x="15" y="20" width="3" height="12" fill={onLight ? '#F0F7FA' : '#1A2549'} />
-        <rect x="20" y="20" width="3" height="12" fill={onLight ? '#F0F7FA' : '#1A2549'} />
-        <rect x="25" y="20" width="3" height="12" fill={onLight ? '#F0F7FA' : '#1A2549'} />
-        <path d="M20 4 L28 16 L12 16 Z" fill={markFill} />
-        <rect x="19" y="1" width="2" height="6" fill={markFill} />
-        <rect x="17" y="3" width="6" height="2" fill={markFill} />
-      </svg>
+    <div className={cn('inline-flex items-center gap-3', className)} aria-label="SAIACS — South Asia Institute of Advanced Christian Studies">
+      <img
+        src={src}
+        alt=""
+        width={size}
+        height={size}
+        className="shrink-0"
+        style={{ display: 'block' }}
+      />
       {showWordmark && (
-        <div className="leading-tight" style={{ color: textFill }}>
+        <div className="leading-tight" style={{ color: textColor }}>
           <div className="font-display text-[11px] font-bold uppercase tracking-wider">South Asia</div>
           <div className="font-display text-[11px] font-bold uppercase tracking-wider">Institute of Advanced</div>
           <div className="font-display text-[11px] font-bold uppercase tracking-wider">Christian Studies</div>

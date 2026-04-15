@@ -36,10 +36,22 @@ serve(async (req) => {
 
     return json({ ok: true, order_id: orderId, order_number: orderNumber });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = extractErrorMessage(err);
+    console.error('[generate-order-number] error:', err);
     return json({ error: message }, 500);
   }
 });
+
+function extractErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object') {
+    const e = err as Record<string, unknown>;
+    if (typeof e.message === 'string') return e.message;
+    if (typeof e.error === 'string') return e.error;
+    try { return JSON.stringify(err); } catch { /* fallthrough */ }
+  }
+  return String(err);
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

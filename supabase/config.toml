@@ -23,13 +23,16 @@ site_url = "http://localhost:5173"
 additional_redirect_urls = ["http://localhost:5173/**"]
 jwt_expiry = 3600
 enable_signup = false
-enable_confirmations = false
 
 [functions.generate-order-number]
 verify_jwt = false
 
+# NOTE: verify_jwt=false lets the function handle its own auth.
+# This is intentional — ES256-signed Supabase JWTs aren't supported by the
+# gateway verifier at the moment, so each function validates the caller's
+# token + role via supabase.auth.getUser() before proceeding.
 [functions.calculate-price]
-verify_jwt = true
+verify_jwt = false
 
 [functions.create-user]
-verify_jwt = true
+verify_jwt = false

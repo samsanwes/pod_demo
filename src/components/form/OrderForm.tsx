@@ -97,8 +97,12 @@ export function OrderForm() {
     if (!contact) return;
     setSubmitting(true);
     try {
-      // Insert the order row (RLS: public insert allowed)
+      // Generate UUID client-side — anon has INSERT but no SELECT policy, so we
+      // can't round-trip via RETURNING. Using a known id lets us link files and
+      // call the edge function without reading the row back.
+      const orderId = crypto.randomUUID();
       const orderPayload: Record<string, unknown> = {
+        id: orderId,
         status: 'new',
         ...contact,
       };
@@ -127,14 +131,8 @@ export function OrderForm() {
         if (orderPayload[k] === '') orderPayload[k] = null;
       });
 
-      const { data: inserted, error: insertErr } = await supabase
-        .from('orders')
-        .insert(orderPayload)
-        .select('id')
-        .single();
-
+      const { error: insertErr } = await supabase.from('orders').insert(orderPayload);
       if (insertErr) throw insertErr;
-      const orderId = (inserted as { id: string }).id;
 
       // Insert file rows
       if (files.length > 0) {
