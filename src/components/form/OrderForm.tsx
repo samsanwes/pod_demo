@@ -75,19 +75,10 @@ export function OrderForm() {
     if (contact.binding_type === 'perfect') {
       const ok = await bookForm.trigger();
       if (!ok) return;
-      if (files.filter((f) => f.file_type === 'inner_pages').length === 0 ||
-          files.filter((f) => f.file_type === 'cover_page').length === 0) {
-        toast({ variant: 'destructive', title: 'Files required', description: 'Please upload both inner pages and cover.' });
-        return;
-      }
       setBookSpec(bookForm.getValues());
     } else {
       const ok = await printForm.trigger();
       if (!ok) return;
-      if (files.filter((f) => f.file_type === 'print_file').length === 0) {
-        toast({ variant: 'destructive', title: 'File required', description: 'Please upload a print file.' });
-        return;
-      }
       setPrintSpec(printForm.getValues());
     }
     setStep(3);

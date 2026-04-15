@@ -85,12 +85,13 @@ export function Step2PrintSpec({ files, setFiles, anonFolder }: Props) {
       <hr />
       <div>
         <h3 className="font-display text-lg font-semibold">Upload print-ready file</h3>
-        <p className="mt-1 text-sm text-muted-foreground">PDF preferred.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          PDF preferred. Optional — you can also share files via email after submitting.
+        </p>
         <div className="mt-4 max-w-md">
           <FileUpload
             label="Print file"
             fileType="print_file"
-            required
             value={printFile}
             onChange={(m) => {
               const others = files.filter((f) => f.file_type !== 'print_file');

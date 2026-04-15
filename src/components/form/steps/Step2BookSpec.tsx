@@ -83,11 +83,11 @@ export function Step2BookSpec({ files, setFiles, anonFolder }: Props) {
       <div>
         <h3 className="font-display text-lg font-semibold">Upload print-ready files</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          PDF preferred. We'll review for print-readiness before quoting.
+          PDF preferred. Optional — you can also share files via email after submitting.
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <FileUpload label="Inner pages" fileType="inner_pages" required value={inner} onChange={(m) => setOne(m, 'inner_pages')} anonFolder={anonFolder} />
-          <FileUpload label="Cover" fileType="cover_page" required value={cover} onChange={(m) => setOne(m, 'cover_page')} anonFolder={anonFolder} />
+          <FileUpload label="Inner pages" fileType="inner_pages" value={inner} onChange={(m) => setOne(m, 'inner_pages')} anonFolder={anonFolder} />
+          <FileUpload label="Cover" fileType="cover_page" value={cover} onChange={(m) => setOne(m, 'cover_page')} anonFolder={anonFolder} />
         </div>
       </div>
     </div>
