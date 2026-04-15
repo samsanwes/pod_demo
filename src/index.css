@@ -1,0 +1,66 @@
+@import '@fontsource/merriweather/300.css';
+@import '@fontsource/merriweather/400.css';
+@import '@fontsource/merriweather/700.css';
+@import '@fontsource/raleway/300.css';
+@import '@fontsource/raleway/400.css';
+@import '@fontsource/raleway/500.css';
+@import '@fontsource/raleway/600.css';
+@import '@fontsource/raleway/700.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* shadcn semantic tokens mapped to SAIACS brand */
+    --background: 197 50% 96%; /* Snow #F0F7FA */
+    --foreground: 222 47% 19%; /* Foundations #1A2549 */
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 19%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 19%;
+
+    --primary: 222 47% 19%; /* Foundations */
+    --primary-foreground: 197 50% 96%; /* Snow */
+
+    --secondary: 214 53% 79%; /* Sky #9FC3F1 */
+    --secondary-foreground: 222 47% 19%;
+
+    --muted: 197 30% 92%;
+    --muted-foreground: 222 20% 40%;
+
+    --accent: 53 100% 48%; /* Royal Gold #F5D700 */
+    --accent-foreground: 222 47% 19%;
+
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 30% 85%;
+    --input: 214 30% 85%;
+    --ring: 222 47% 19%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+  }
+}
