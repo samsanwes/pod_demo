@@ -295,7 +295,7 @@ export function Reports() {
                   <TableCell className="text-right">{t.totalCopies}</TableCell>
                   <TableCell className="text-right">{humanise(t.avgHoursPerOrder)}</TableCell>
                   <TableCell className="text-right">{humanise(t.medianHoursPerOrder)}</TableCell>
-                  <TableCell className="text-right">{t.avgHoursPerCopy.toFixed(2)} hrs</TableCell>
+                  <TableCell className="text-right">{(t.avgHoursPerCopy * 60).toFixed(1)} min</TableCell>
                 </TableRow>
               ))}
             </TableBody>
