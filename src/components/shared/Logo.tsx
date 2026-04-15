@@ -1,46 +1,44 @@
 import { cn } from '@/lib/utils';
-import logoPrimary from '@/assets/logo/logo-primary.svg';
-import logoWhite from '@/assets/logo/logo-white.svg';
+import wordmarkFoundations from '@/assets/logo/wordmark-foundations.svg';
+import wordmarkWhite from '@/assets/logo/wordmark-white.svg';
+import logoMarkPrimary from '@/assets/logo/logo-primary.svg';
+import logoMarkWhite from '@/assets/logo/logo-white.svg';
 
 interface LogoProps {
+  /** 'primary' = brand navy on light backgrounds; 'inverse' = white on dark. */
   variant?: 'primary' | 'inverse';
+  /** When true, shows just the square logomark (no wordmark). */
+  markOnly?: boolean;
   className?: string;
-  showWordmark?: boolean;
+  /** Pixel height. Width follows the SVG's natural aspect ratio. */
   size?: number;
 }
 
 /**
  * SAIACS brand logo.
  *
- * Primary = navy (Foundations #1A2549) on light backgrounds.
- * Inverse = white on dark (Foundations / Traditions) backgrounds.
+ * Renders the official wordmark SVG (mark + stacked "South Asia Institute of
+ * Advanced Christian Studies" text, supplied in brand colors) by default.
+ * Pass `markOnly` for tight spaces where only the square logomark is used.
  *
  * Brand rules enforced:
- *  - No rotation, stretching, or cropping (we render at a fixed aspect ratio).
- *  - Clear space ≥ height of the pillar (we pad the wordmark accordingly).
+ *  - No rotation, stretching, or cropping (rendered at natural aspect ratio).
+ *  - Clear space ≥ height of the pillar (wrap with padding or CSS as needed).
  *  - No gradients or shadows (no filter classes applied).
  */
-export function Logo({ variant = 'primary', className, showWordmark = true, size = 40 }: LogoProps) {
-  const src = variant === 'primary' ? logoPrimary : logoWhite;
-  const textColor = variant === 'primary' ? '#1A2549' : '#F0F7FA';
+export function Logo({ variant = 'primary', markOnly = false, className, size = 64 }: LogoProps) {
+  const src = markOnly
+    ? variant === 'primary' ? logoMarkPrimary : logoMarkWhite
+    : variant === 'primary' ? wordmarkFoundations : wordmarkWhite;
 
   return (
-    <div className={cn('inline-flex items-center gap-3', className)} aria-label="SAIACS — South Asia Institute of Advanced Christian Studies">
-      <img
-        src={src}
-        alt=""
-        width={size}
-        height={size}
-        className="shrink-0"
-        style={{ display: 'block' }}
-      />
-      {showWordmark && (
-        <div className="leading-tight" style={{ color: textColor }}>
-          <div className="font-display text-[11px] font-bold uppercase tracking-wider">South Asia</div>
-          <div className="font-display text-[11px] font-bold uppercase tracking-wider">Institute of Advanced</div>
-          <div className="font-display text-[11px] font-bold uppercase tracking-wider">Christian Studies</div>
-        </div>
-      )}
-    </div>
+    <img
+      src={src}
+      alt="SAIACS — South Asia Institute of Advanced Christian Studies"
+      height={size}
+      className={cn('block shrink-0 select-none', className)}
+      style={{ height: size, width: 'auto' }}
+      draggable={false}
+    />
   );
 }

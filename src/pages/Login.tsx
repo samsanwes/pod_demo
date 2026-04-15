@@ -37,7 +37,7 @@ export function LoginPage() {
   return (
     <div className="grid min-h-screen grid-cols-1 md:grid-cols-2">
       <div className="flex items-center justify-center bg-brand-foundations p-8">
-        <Logo variant="inverse" />
+        <Logo variant="inverse" size={240} />
       </div>
       <div className="flex items-center justify-center p-8">
         <form onSubmit={onSubmit} className="w-full max-w-sm space-y-6">
