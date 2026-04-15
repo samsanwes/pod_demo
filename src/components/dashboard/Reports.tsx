@@ -80,20 +80,42 @@ export function Reports() {
           .in('status', PRODUCTION_STATUSES)
           .order('delivery_date', { ascending: true })
           .limit(1000),
-        // Fetch all "status" changes in this period so we can compute turnaround.
+        // Fetch all status transitions (not date-filtered) so we can pair up
+        // `in_production` and `ready` timestamps even when they span the period
+        // boundary. We filter to the period via the "ready" timestamp below.
         supabase
           .from('order_status_log')
           .select('*')
           .eq('field_changed', 'status')
-          .gte('changed_at', start)
           .order('changed_at', { ascending: true })
-          .limit(10000),
+          .limit(20000),
       ]);
       if (cancelled) return;
       const orders = (periodRes.data ?? []) as OrderRow[];
       setAllOrders(orders);
       setProductionOrders((productionRes.data ?? []) as OrderRow[]);
-      setTurnaround(computeTurnaround(orders, (turnaroundRes.data ?? []) as OrderStatusLogRow[]));
+
+      // Turnaround: we also need any orders that reached `ready` during the
+      // period but were submitted BEFORE the period started. Fetch them by id.
+      const logs = (turnaroundRes.data ?? []) as OrderStatusLogRow[];
+      const periodStartMs = new Date(periodStart(period)).getTime();
+      const readyOrderIds = Array.from(new Set(
+        logs
+          .filter((l) => l.new_value === 'ready' && new Date(l.changed_at).getTime() >= periodStartMs)
+          .map((l) => l.order_id)
+      ));
+      const knownIds = new Set(orders.map((o) => o.id));
+      const missingIds = readyOrderIds.filter((id) => !knownIds.has(id));
+      let extraOrders: OrderRow[] = [];
+      if (missingIds.length > 0) {
+        const { data: extra } = await supabase
+          .from('orders')
+          .select('*')
+          .in('id', missingIds);
+        extraOrders = (extra ?? []) as OrderRow[];
+      }
+      if (cancelled) return;
+      setTurnaround(computeTurnaround([...orders, ...extraOrders], logs, periodStart(period)));
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -232,12 +254,15 @@ export function Reports() {
       {/* Turnaround by binding type */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Turnaround time by print type — {PERIOD_LABEL[period]}</CardTitle>
+          <CardTitle className="text-base">Production turnaround by print type — {PERIOD_LABEL[period]}</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Average time from <em>Confirmed</em> to <em>Ready</em>, grouped by binding option. Only
-            orders that reached <em>Ready</em> within the period are counted. Per-order shows raw
-            turnaround; per-copy normalises for run size — useful for comparing binding types with
-            very different typical quantities.
+            Time from <em>In production</em> to <em>Ready</em>, grouped by binding option. An order
+            counts here if its <em>Ready</em> transition falls in the selected period, even if it
+            was submitted earlier. If an order skipped the <em>In production</em> stage (e.g. a
+            manager jumped directly to <em>Ready</em>), the order's submission time is used as a
+            fallback start. <strong>Per-order</strong> shows raw hours; <strong>per-copy</strong>
+            normalises for run size — useful when comparing binding types that typically have very
+            different quantities.
           </p>
         </CardHeader>
         <CardContent className="p-0">
@@ -368,19 +393,30 @@ export function Reports() {
 /**
  * Compute average turnaround by binding type.
  *
- * Algorithm: for each status-change log row that sets a row to 'confirmed' or 'ready',
- * record the timestamp. Pair them up per order. Group by order.binding_type, output
- * averages in hours.
+ * Metric: production time = first `in_production` → first `ready` transition.
+ * This answers "how long did production actually take" — the manager-facing
+ * performance measure. Orders that jumped straight from `new` to `ready`
+ * (no in_production intermediate log row) fall back to using the order's
+ * `created_at` as the start so they still contribute to the average.
+ *
+ * Filtering: an order is "completed in this period" if the `ready` timestamp
+ * falls in the period. We still fetch ALL log rows so we can find the matching
+ * `in_production` even when it happened before the period started.
  */
-function computeTurnaround(orders: OrderRow[], logs: OrderStatusLogRow[]): TurnaroundEntry[] {
+function computeTurnaround(
+  orders: OrderRow[],
+  logs: OrderStatusLogRow[],
+  periodStartIso: string
+): TurnaroundEntry[] {
   const orderById = new Map<string, OrderRow>();
   for (const o of orders) orderById.set(o.id, o);
 
-  const confirmedAt: Record<string, number> = {};
+  const periodStartMs = new Date(periodStartIso).getTime();
+  const inProductionAt: Record<string, number> = {};
   const readyAt: Record<string, number> = {};
   for (const l of logs) {
-    if (l.new_value === 'confirmed' && !confirmedAt[l.order_id]) {
-      confirmedAt[l.order_id] = new Date(l.changed_at).getTime();
+    if (l.new_value === 'in_production' && !inProductionAt[l.order_id]) {
+      inProductionAt[l.order_id] = new Date(l.changed_at).getTime();
     }
     if (l.new_value === 'ready' && !readyAt[l.order_id]) {
       readyAt[l.order_id] = new Date(l.changed_at).getTime();
@@ -389,13 +425,20 @@ function computeTurnaround(orders: OrderRow[], logs: OrderStatusLogRow[]): Turna
 
   const buckets: Record<string, { hours: number[]; copies: number[] }> = {};
   for (const [orderId, tReady] of Object.entries(readyAt)) {
-    const tConfirmed = confirmedAt[orderId];
-    if (!tConfirmed || tConfirmed > tReady) continue; // can't compute
+    // Only include orders that reached `ready` within the selected period.
+    if (tReady < periodStartMs) continue;
+
     const order = orderById.get(orderId);
     if (!order) continue;
+
+    // Production start: prefer the logged `in_production` transition;
+    // fall back to the order's created_at if the order skipped that status.
+    const tStart = inProductionAt[orderId] ?? new Date(order.created_at).getTime();
+    if (tStart > tReady) continue;
+
     const key = order.binding_type;
     if (!buckets[key]) buckets[key] = { hours: [], copies: [] };
-    buckets[key].hours.push((tReady - tConfirmed) / (1000 * 60 * 60));
+    buckets[key].hours.push((tReady - tStart) / (1000 * 60 * 60));
     buckets[key].copies.push(order.quantity || 1);
   }
 
