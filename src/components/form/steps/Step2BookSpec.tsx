@@ -4,7 +4,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileUpload } from '../FileUpload';
 import type { BookSpecValues, UploadedFileMeta } from '../schemas';
-import { TRIM_SIZES, PAPER_TYPES, COLOUR_MODES, LAMINATION_OPTIONS } from '../schemas';
+import {
+  TRIM_SIZES,
+  TEXT_PAPER_OPTIONS,
+  COVER_PAPER_OPTIONS,
+  COLOUR_MODES,
+  LAMINATION_OPTIONS,
+} from '../schemas';
 import { titleCase } from '@/lib/utils';
 
 interface Props {
@@ -47,9 +53,17 @@ export function Step2BookSpec({ files, setFiles, anonFolder }: Props) {
         </Field>
         <Field label="Text paper" error={errors.paper_type?.message}>
           <Select value={watch('paper_type')} onValueChange={(v) => setValue('paper_type', v, { shouldValidate: true })}>
-            <SelectTrigger><SelectValue placeholder="Choose paper…" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Choose text paper…" /></SelectTrigger>
             <SelectContent>
-              {PAPER_TYPES.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+              {TEXT_PAPER_OPTIONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Cover paper" error={errors.cover_paper_type?.message}>
+          <Select value={watch('cover_paper_type')} onValueChange={(v) => setValue('cover_paper_type', v, { shouldValidate: true })}>
+            <SelectTrigger><SelectValue placeholder="Choose cover paper…" /></SelectTrigger>
+            <SelectContent>
+              {COVER_PAPER_OPTIONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
             </SelectContent>
           </Select>
         </Field>

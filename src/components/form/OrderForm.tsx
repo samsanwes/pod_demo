@@ -12,7 +12,7 @@ import { Step2BookSpec } from './steps/Step2BookSpec';
 import { Step2PrintSpec } from './steps/Step2PrintSpec';
 import { Step3Review } from './steps/Step3Review';
 import {
-  step1Schema, bookSpecSchema, printSpecSchema,
+  step1Schema, bookSpecSchema, printSpecSchema, BOOK_LIKE_BINDINGS,
   type Step1Values, type BookSpecValues, type PrintSpecValues, type UploadedFileMeta,
 } from './schemas';
 
@@ -47,7 +47,8 @@ export function OrderForm() {
   const bookForm = useForm<BookSpecValues>({
     resolver: zodResolver(bookSpecSchema),
     defaultValues: bookSpec ?? {
-      trim_size: 'A5', trim_size_other: '', num_pages: 100, paper_type: 'Maplitho 80gsm',
+      trim_size: 'A5', trim_size_other: '', num_pages: 100,
+      paper_type: 'Maplitho 80gsm', cover_paper_type: 'Art Card 250gsm',
       cover_printing: 'colour', inner_printing: 'bw', cover_lamination: 'matte',
     },
     mode: 'onBlur',
@@ -61,7 +62,10 @@ export function OrderForm() {
     mode: 'onBlur',
   });
 
-  const isPerfect = contact?.binding_type === 'perfect';
+  // Perfect binding + saddle stitch both use the "book" spec (trim size, pages,
+  // text + cover paper, cover printing, lamination). Everything else uses the
+  // simpler print spec.
+  const isBookLike = contact ? BOOK_LIKE_BINDINGS.includes(contact.binding_type) : false;
 
   async function nextFrom1() {
     const ok = await step1Form.trigger();
@@ -72,7 +76,7 @@ export function OrderForm() {
 
   async function nextFrom2() {
     if (!contact) return;
-    if (contact.binding_type === 'perfect') {
+    if (BOOK_LIKE_BINDINGS.includes(contact.binding_type)) {
       const ok = await bookForm.trigger();
       if (!ok) return;
       setBookSpec(bookForm.getValues());
@@ -98,12 +102,13 @@ export function OrderForm() {
         ...contact,
       };
 
-      if (contact.binding_type === 'perfect' && bookSpec) {
+      if (BOOK_LIKE_BINDINGS.includes(contact.binding_type) && bookSpec) {
         Object.assign(orderPayload, {
           trim_size: bookSpec.trim_size,
           trim_size_other: bookSpec.trim_size_other || null,
           num_pages: bookSpec.num_pages,
           paper_type: bookSpec.paper_type,
+          cover_paper_type: bookSpec.cover_paper_type,
           cover_printing: bookSpec.cover_printing,
           inner_printing: bookSpec.inner_printing,
           cover_lamination: bookSpec.cover_lamination,
@@ -188,7 +193,7 @@ export function OrderForm() {
           </FormProvider>
         )}
         {step === 2 && contact && (
-          isPerfect ? (
+          isBookLike ? (
             <FormProvider {...bookForm}>
               <Step2BookSpec files={files} setFiles={setFiles} anonFolder={anonFolder} />
             </FormProvider>

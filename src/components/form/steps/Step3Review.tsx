@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { UploadedFileMeta, Step1Values, BookSpecValues, PrintSpecValues } from '../schemas';
+import { BINDING_LABELS } from '../schemas';
 import { titleCase, formatDate } from '@/lib/utils';
 
 interface Props {
@@ -25,7 +26,7 @@ export function Step3Review({ contact, bookSpec, printSpec, files }: Props) {
       <Card>
         <CardHeader><CardTitle className="text-lg">Order basics</CardTitle></CardHeader>
         <CardContent className="grid gap-1 text-sm">
-          <Row k="Binding" v={contact.binding_type === 'other' ? contact.binding_type_other ?? '—' : titleCase(contact.binding_type)} />
+          <Row k="Print type" v={contact.binding_type === 'other' ? contact.binding_type_other ?? '—' : BINDING_LABELS[contact.binding_type]} />
           <Row k="Quantity" v={String(contact.quantity)} />
           <Row k="Required by" v={formatDate(contact.delivery_date)} />
           <Row k="Delivery" v={titleCase(contact.delivery_method)} />
@@ -40,7 +41,8 @@ export function Step3Review({ contact, bookSpec, printSpec, files }: Props) {
           <CardContent className="grid gap-1 text-sm">
             <Row k="Trim size" v={bookSpec.trim_size === 'other' ? bookSpec.trim_size_other ?? '—' : bookSpec.trim_size} />
             <Row k="Pages" v={String(bookSpec.num_pages)} />
-            <Row k="Paper" v={bookSpec.paper_type} />
+            <Row k="Text paper" v={bookSpec.paper_type} />
+            <Row k="Cover paper" v={bookSpec.cover_paper_type} />
             <Row k="Inner printing" v={bookSpec.inner_printing === 'bw' ? 'Black & white' : 'Colour'} />
             <Row k="Cover printing" v={bookSpec.cover_printing === 'bw' ? 'Black & white' : 'Colour'} />
             <Row k="Cover lamination" v={titleCase(bookSpec.cover_lamination)} />

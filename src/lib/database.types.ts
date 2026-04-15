@@ -53,6 +53,7 @@ export interface OrderRow {
   trim_size_other: string | null;
   num_pages: number | null;
   paper_type: string | null;
+  cover_paper_type: string | null;
   cover_printing: ColourMode | null;
   inner_printing: ColourMode | null;
   cover_lamination: LaminationOption | null;

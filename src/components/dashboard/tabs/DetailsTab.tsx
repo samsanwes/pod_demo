@@ -1,5 +1,7 @@
 import type { OrderRow } from '@/lib/database.types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { BINDING_LABELS, BOOK_LIKE_BINDINGS } from '@/components/form/schemas';
+import type { BindingType } from '@/lib/database.types';
 import { titleCase, formatDate, formatDateTime } from '@/lib/utils';
 
 export function DetailsTab({ order }: { order: OrderRow }) {
@@ -18,7 +20,7 @@ export function DetailsTab({ order }: { order: OrderRow }) {
       <Card>
         <CardHeader><CardTitle className="text-base">Order</CardTitle></CardHeader>
         <CardContent className="grid gap-1 text-sm">
-          <Row k="Binding" v={order.binding_type === 'other' ? order.binding_type_other ?? '—' : titleCase(order.binding_type)} />
+          <Row k="Print type" v={order.binding_type === 'other' ? order.binding_type_other ?? '—' : BINDING_LABELS[order.binding_type as BindingType] ?? titleCase(order.binding_type)} />
           <Row k="Quantity" v={String(order.quantity)} />
           <Row k="Delivery by" v={formatDate(order.delivery_date)} />
           <Row k="Delivery method" v={titleCase(order.delivery_method)} />
@@ -27,13 +29,14 @@ export function DetailsTab({ order }: { order: OrderRow }) {
         </CardContent>
       </Card>
 
-      {order.binding_type === 'perfect' && (
+      {BOOK_LIKE_BINDINGS.includes(order.binding_type) && (
         <Card>
           <CardHeader><CardTitle className="text-base">Book specification</CardTitle></CardHeader>
           <CardContent className="grid gap-1 text-sm">
             <Row k="Trim size" v={order.trim_size === 'other' ? order.trim_size_other ?? '—' : order.trim_size ?? '—'} />
             <Row k="Pages" v={order.num_pages?.toString() ?? '—'} />
-            <Row k="Paper" v={order.paper_type ?? '—'} />
+            <Row k="Text paper" v={order.paper_type ?? '—'} />
+            <Row k="Cover paper" v={order.cover_paper_type ?? '—'} />
             <Row k="Inner printing" v={order.inner_printing === 'bw' ? 'B/W' : order.inner_printing === 'colour' ? 'Colour' : '—'} />
             <Row k="Cover printing" v={order.cover_printing === 'bw' ? 'B/W' : order.cover_printing === 'colour' ? 'Colour' : '—'} />
             <Row k="Cover lamination" v={order.cover_lamination ? titleCase(order.cover_lamination) : '—'} />
@@ -41,7 +44,7 @@ export function DetailsTab({ order }: { order: OrderRow }) {
         </Card>
       )}
 
-      {order.binding_type !== 'perfect' && (
+      {!BOOK_LIKE_BINDINGS.includes(order.binding_type) && (
         <Card>
           <CardHeader><CardTitle className="text-base">Print specification</CardTitle></CardHeader>
           <CardContent className="grid gap-1 text-sm">

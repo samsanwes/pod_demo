@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,7 +46,14 @@ export function LoginPage() {
       <div className="flex items-center justify-center bg-brand-foundations p-8">
         <Logo variant="inverse" size={240} />
       </div>
-      <div className="flex items-center justify-center p-8">
+      <div className="relative flex items-center justify-center p-8">
+        <Link
+          to="/"
+          className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-brand-snow hover:text-foreground md:left-8 md:top-8"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to order form
+        </Link>
         <form onSubmit={onSubmit} className="w-full max-w-sm space-y-6">
           <div>
             <h1 className="font-display text-3xl font-bold">Staff sign in</h1>

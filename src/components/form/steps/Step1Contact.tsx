@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Step1Values } from '../schemas';
-import { BINDING_TYPES, DELIVERY_METHODS } from '../schemas';
+import { BINDING_OPTIONS_PUBLIC, BINDING_LABELS, DELIVERY_METHODS } from '../schemas';
 import { titleCase } from '@/lib/utils';
 
 export function Step1Contact() {
@@ -33,18 +33,18 @@ export function Step1Contact() {
       <hr />
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Binding type" error={errors.binding_type?.message}>
+        <Field label="Print Type / Binding Option" error={errors.binding_type?.message}>
           <Select value={binding} onValueChange={(v) => setValue('binding_type', v as Step1Values['binding_type'], { shouldValidate: true })}>
-            <SelectTrigger><SelectValue placeholder="Choose binding…" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Choose print type…" /></SelectTrigger>
             <SelectContent>
-              {BINDING_TYPES.map((b) => (
-                <SelectItem key={b} value={b}>{titleCase(b)}</SelectItem>
+              {BINDING_OPTIONS_PUBLIC.map((b) => (
+                <SelectItem key={b} value={b}>{BINDING_LABELS[b]}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </Field>
         {binding === 'other' && (
-          <Field label="Describe binding" error={errors.binding_type_other?.message}>
+          <Field label="Describe print type" error={errors.binding_type_other?.message}>
             <Input {...register('binding_type_other')} placeholder="e.g. spiral with tabs" />
           </Field>
         )}

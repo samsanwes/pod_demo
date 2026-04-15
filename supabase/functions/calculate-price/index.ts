@@ -23,6 +23,7 @@ interface Order {
   num_pages: number | null;
   trim_size: string | null;
   paper_type: string | null;
+  cover_paper_type: string | null;
   inner_printing: 'bw' | 'colour' | null;
   cover_printing: 'bw' | 'colour' | null;
   cover_lamination: 'glossy' | 'matte' | 'velvet' | 'none' | null;
@@ -32,6 +33,8 @@ interface Order {
   margin_percent: number;
   inflation_percent: number;
 }
+
+const NOT_SURE = 'Not sure — please recommend';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -79,8 +82,8 @@ serve(async (req) => {
 
     const components: Record<string, number> = {};
 
-    // --- Book-binding (perfect) pricing ---
-    if (order.binding_type === 'perfect') {
+    // --- Book-binding pricing (perfect binding + saddle stitch) ---
+    if (['perfect', 'saddle'].includes(order.binding_type)) {
       const pages = order.num_pages ?? 0;
       const trim = order.trim_size ?? 'A5';
       const printerPaperSize = 'A3'; // default; could be looked up from paper_type config
@@ -88,13 +91,15 @@ serve(async (req) => {
       const pagesPerSheet = impos?.pages_per_sheet ?? 4;
       const sheetsPerCopy = Math.ceil(pages / pagesPerSheet);
 
-      // Text paper cost
-      const matchedTextPaper = matchPaper(papers, order.paper_type, 'text');
+      // Text paper cost. "Not sure" falls back to any active text paper.
+      const textPref = order.paper_type === NOT_SURE ? null : order.paper_type;
+      const matchedTextPaper = matchPaper(papers, textPref, 'text');
       if (matchedTextPaper) {
         components.paper_text = sheetsPerCopy * matchedTextPaper.price_per_sheet;
       }
-      // Cover paper (assume 1 sheet cover)
-      const coverPaper = matchPaper(papers, null, 'cover');
+      // Cover paper (assume 1 sheet cover). Honor explicit client choice when set.
+      const coverPref = order.cover_paper_type === NOT_SURE ? null : order.cover_paper_type;
+      const coverPaper = matchPaper(papers, coverPref, 'cover');
       if (coverPaper) components.paper_cover = coverPaper.price_per_sheet;
 
       // Printing (inner)
