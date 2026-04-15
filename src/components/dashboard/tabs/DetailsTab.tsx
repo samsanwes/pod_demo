@@ -1,6 +1,6 @@
 import type { OrderRow } from '@/lib/database.types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BINDING_LABELS, BOOK_LIKE_BINDINGS } from '@/components/form/schemas';
+import { BINDING_LABELS, BOOK_LIKE_BINDINGS, DELIVERY_LABELS } from '@/components/form/schemas';
 import type { BindingType } from '@/lib/database.types';
 import { titleCase, formatDate, formatDateTime } from '@/lib/utils';
 
@@ -23,7 +23,7 @@ export function DetailsTab({ order }: { order: OrderRow }) {
           <Row k="Print type" v={order.binding_type === 'other' ? order.binding_type_other ?? '—' : BINDING_LABELS[order.binding_type as BindingType] ?? titleCase(order.binding_type)} />
           <Row k="Quantity" v={String(order.quantity)} />
           <Row k="Delivery by" v={formatDate(order.delivery_date)} />
-          <Row k="Delivery method" v={titleCase(order.delivery_method)} />
+          <Row k="Delivery method" v={DELIVERY_LABELS[order.delivery_method]} />
           {order.delivery_method === 'courier' && <Row k="Address" v={order.delivery_address ?? ''} />}
           <Row k="Submitted" v={formatDateTime(order.created_at)} />
         </CardContent>

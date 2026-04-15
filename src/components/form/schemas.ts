@@ -28,6 +28,12 @@ export const BINDING_OPTIONS_PUBLIC = [
 export const BOOK_LIKE_BINDINGS: readonly string[] = ['perfect', 'saddle'];
 
 export const DELIVERY_METHODS = ['pickup', 'courier'] as const;
+
+/** UI labels for delivery methods. Database enum stays as 'pickup' / 'courier'. */
+export const DELIVERY_LABELS: Record<(typeof DELIVERY_METHODS)[number], string> = {
+  pickup: 'Pickup',
+  courier: 'Speedpost / Courier',
+};
 export const COLOUR_MODES = ['bw', 'colour'] as const;
 export const LAMINATION_OPTIONS = ['glossy', 'matte', 'velvet', 'none'] as const;
 

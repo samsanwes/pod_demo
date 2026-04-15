@@ -37,6 +37,7 @@ interface Order {
   printing_type: ('bw' | 'colour')[] | null;
   printing_sides: string | null;
   delivery_method: 'pickup' | 'courier';
+  shipping_charge: number | null;
   margin_percent: number;
   inflation_percent: number;
   discount_percent: number;
@@ -167,8 +168,11 @@ serve(async (req) => {
     const margin = Number(order.margin_percent ?? 30);
     const inflation = Number(order.inflation_percent ?? 9);
     const discount = Number(order.discount_percent ?? 0);
+    // Prefer per-order shipping when set; fall back to the project default.
     const shippingCharge = order.delivery_method === 'courier'
-      ? Number(settings.shipping_charge ?? 0)
+      ? (order.shipping_charge != null
+          ? Number(order.shipping_charge)
+          : Number(settings.shipping_charge ?? 0))
       : 0;
 
     const marginDenom = Math.max(0.0001, 1 - margin / 100);

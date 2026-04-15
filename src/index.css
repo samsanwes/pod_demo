@@ -64,3 +64,32 @@
     @apply font-display;
   }
 }
+
+/* Print stylesheet — used by the Reports "Print" button and the OS Print dialog.
+   Hides the dashboard chrome (sidebar, topbar, nav links) and prints only the
+   report content on a white background with tight spacing. */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* Hide dashboard chrome */
+  aside,
+  header {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  /* Don't clip cards/tables across pages awkwardly */
+  .break-before-page { page-break-before: always; }
+  table { page-break-inside: auto; }
+  tr    { page-break-inside: avoid; page-break-after: auto; }
+}

@@ -79,6 +79,7 @@ export interface OrderRow {
   courier_name: string | null;
   tracking_number: string | null;
   dispatch_date: string | null;
+  shipping_charge: number | null;
 
   zoho_invoice_id: string | null;
   invoice_sent_at: string | null;

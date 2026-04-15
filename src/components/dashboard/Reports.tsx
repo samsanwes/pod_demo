@@ -1,46 +1,65 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Printer } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import type { OrderRow, OrderStatus, ProductionStatus } from '@/lib/database.types';
+import type { OrderRow, OrderStatus, ProductionStatus, OrderStatusLogRow, BindingType } from '@/lib/database.types';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge, ProductionStatusBadge } from '@/components/shared/StatusBadge';
+import { BINDING_LABELS } from '@/components/form/schemas';
 import { formatCurrency, formatDate, titleCase } from '@/lib/utils';
 
-type Period = 'day' | 'week' | 'month';
+type Period = 'day' | 'week' | 'month' | 'quarter' | 'year';
 
 const PERIOD_LABEL: Record<Period, string> = {
   day: 'Today',
   week: 'This week',
   month: 'This month',
+  quarter: 'This quarter',
+  year: 'This year',
 };
 
-// Returns the start of the current day/week/month in the user's local timezone,
-// as an ISO string for use in PostgREST filters.
+/** Start of the current day/week/month/quarter/year in local time, as ISO. */
 function periodStart(p: Period): string {
   const now = new Date();
-  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (p === 'day') return d.toISOString();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (p === 'day') return startOfDay.toISOString();
   if (p === 'week') {
-    // Week starts Monday
-    const dow = d.getDay(); // 0 = Sun
+    const dow = startOfDay.getDay(); // 0 = Sun
     const diff = dow === 0 ? -6 : 1 - dow;
+    const d = new Date(startOfDay);
     d.setDate(d.getDate() + diff);
     return d.toISOString();
   }
-  // month
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  if (p === 'month') return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  if (p === 'quarter') {
+    const qStartMonth = Math.floor(now.getMonth() / 3) * 3;
+    return new Date(now.getFullYear(), qStartMonth, 1).toISOString();
+  }
+  // year
+  return new Date(now.getFullYear(), 0, 1).toISOString();
 }
 
 const REVENUE_STATUSES: OrderStatus[] = ['invoiced', 'closed'];
 const PRODUCTION_STATUSES: OrderStatus[] = ['confirmed', 'in_production', 'ready'];
 
+interface TurnaroundEntry {
+  binding_type: string;
+  orders: number;
+  totalCopies: number;
+  avgHoursPerOrder: number;
+  avgHoursPerCopy: number;
+  medianHoursPerOrder: number;
+}
+
 export function Reports() {
   const [period, setPeriod] = useState<Period>('week');
   const [allOrders, setAllOrders] = useState<OrderRow[]>([]);
   const [productionOrders, setProductionOrders] = useState<OrderRow[]>([]);
+  const [turnaround, setTurnaround] = useState<TurnaroundEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -48,23 +67,33 @@ export function Reports() {
     (async () => {
       setLoading(true);
       const start = periodStart(period);
-      const [periodRes, productionRes] = await Promise.all([
+      const [periodRes, productionRes, turnaroundRes] = await Promise.all([
         supabase
           .from('orders')
           .select('*')
           .gte('created_at', start)
           .order('created_at', { ascending: false })
-          .limit(1000),
+          .limit(5000),
         supabase
           .from('orders')
           .select('*')
           .in('status', PRODUCTION_STATUSES)
           .order('delivery_date', { ascending: true })
           .limit(1000),
+        // Fetch all "status" changes in this period so we can compute turnaround.
+        supabase
+          .from('order_status_log')
+          .select('*')
+          .eq('field_changed', 'status')
+          .gte('changed_at', start)
+          .order('changed_at', { ascending: true })
+          .limit(10000),
       ]);
       if (cancelled) return;
-      setAllOrders((periodRes.data ?? []) as OrderRow[]);
+      const orders = (periodRes.data ?? []) as OrderRow[];
+      setAllOrders(orders);
       setProductionOrders((productionRes.data ?? []) as OrderRow[]);
+      setTurnaround(computeTurnaround(orders, (turnaroundRes.data ?? []) as OrderStatusLogRow[]));
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -98,28 +127,43 @@ export function Reports() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      {/* --- Controls (hidden in print) --- */}
+      <div className="flex items-start justify-between gap-4 print:hidden">
         <div>
           <h1 className="font-display text-2xl font-bold">Reports</h1>
           <p className="text-sm text-muted-foreground">
-            Quick snapshot of order activity, revenue, and what's in production right now.
+            Quick snapshot of order activity, revenue, production load, and turnaround performance.
           </p>
         </div>
-        <div className="space-y-1.5">
-          <div className="text-xs text-muted-foreground">Period</div>
-          <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="day">Today</SelectItem>
-              <SelectItem value="week">This week</SelectItem>
-              <SelectItem value="month">This month</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex items-end gap-2">
+          <div className="space-y-1.5">
+            <div className="text-xs text-muted-foreground">Period</div>
+            <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
+              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="day">Today</SelectItem>
+                <SelectItem value="week">This week</SelectItem>
+                <SelectItem value="month">This month</SelectItem>
+                <SelectItem value="quarter">This quarter</SelectItem>
+                <SelectItem value="year">This year</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="outline" onClick={() => window.print()} aria-label="Print report">
+            <Printer className="mr-2 h-4 w-4" />
+            Print
+          </Button>
         </div>
       </div>
 
+      {/* --- Print-only header (shown only on printed page) --- */}
+      <div className="hidden print:block">
+        <h1 className="font-display text-2xl font-bold">SAIACS POD — Reports ({PERIOD_LABEL[period]})</h1>
+        <p className="text-xs text-muted-foreground">Generated {new Date().toLocaleString()}</p>
+      </div>
+
       {/* Summary cards */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 print:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Orders summary — {PERIOD_LABEL[period]}</CardTitle>
@@ -185,6 +229,55 @@ export function Reports() {
         </Card>
       </div>
 
+      {/* Turnaround by binding type */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Turnaround time by print type — {PERIOD_LABEL[period]}</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Average time from <em>Confirmed</em> to <em>Ready</em>, grouped by binding option. Only
+            orders that reached <em>Ready</em> within the period are counted. Per-order shows raw
+            turnaround; per-copy normalises for run size — useful for comparing binding types with
+            very different typical quantities.
+          </p>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Print type</TableHead>
+                <TableHead className="text-right">Orders completed</TableHead>
+                <TableHead className="text-right">Copies</TableHead>
+                <TableHead className="text-right">Avg / order</TableHead>
+                <TableHead className="text-right">Median / order</TableHead>
+                <TableHead className="text-right">Avg / copy</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Loading…</TableCell></TableRow>}
+              {!loading && turnaround.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    No orders reached "Ready" in this period yet.
+                  </TableCell>
+                </TableRow>
+              )}
+              {turnaround.map((t) => (
+                <TableRow key={t.binding_type}>
+                  <TableCell className="font-medium">
+                    {BINDING_LABELS[t.binding_type as BindingType] ?? titleCase(t.binding_type)}
+                  </TableCell>
+                  <TableCell className="text-right">{t.orders}</TableCell>
+                  <TableCell className="text-right">{t.totalCopies}</TableCell>
+                  <TableCell className="text-right">{humanise(t.avgHoursPerOrder)}</TableCell>
+                  <TableCell className="text-right">{humanise(t.medianHoursPerOrder)}</TableCell>
+                  <TableCell className="text-right">{t.avgHoursPerCopy.toFixed(2)} hrs</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
       {/* Production queue */}
       <Card>
         <CardHeader>
@@ -248,7 +341,7 @@ export function Reports() {
         </CardContent>
       </Card>
 
-      {/* Status-by-status breakdown */}
+      {/* Status totals */}
       <Card>
         <CardHeader><CardTitle className="text-base">Status totals — {PERIOD_LABEL[period]}</CardTitle></CardHeader>
         <CardContent>
@@ -257,7 +350,7 @@ export function Reports() {
           ) : Object.keys(ordersSummary.byStatus).length === 0 ? (
             <p className="text-sm text-muted-foreground">No orders in this period.</p>
           ) : (
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4 print:grid-cols-4">
               {Object.entries(ordersSummary.byStatus).map(([status, count]) => (
                 <div key={status} className="rounded border bg-white p-3">
                   <div className="text-xs text-muted-foreground">{titleCase(status)}</div>
@@ -270,4 +363,66 @@ export function Reports() {
       </Card>
     </div>
   );
+}
+
+/**
+ * Compute average turnaround by binding type.
+ *
+ * Algorithm: for each status-change log row that sets a row to 'confirmed' or 'ready',
+ * record the timestamp. Pair them up per order. Group by order.binding_type, output
+ * averages in hours.
+ */
+function computeTurnaround(orders: OrderRow[], logs: OrderStatusLogRow[]): TurnaroundEntry[] {
+  const orderById = new Map<string, OrderRow>();
+  for (const o of orders) orderById.set(o.id, o);
+
+  const confirmedAt: Record<string, number> = {};
+  const readyAt: Record<string, number> = {};
+  for (const l of logs) {
+    if (l.new_value === 'confirmed' && !confirmedAt[l.order_id]) {
+      confirmedAt[l.order_id] = new Date(l.changed_at).getTime();
+    }
+    if (l.new_value === 'ready' && !readyAt[l.order_id]) {
+      readyAt[l.order_id] = new Date(l.changed_at).getTime();
+    }
+  }
+
+  const buckets: Record<string, { hours: number[]; copies: number[] }> = {};
+  for (const [orderId, tReady] of Object.entries(readyAt)) {
+    const tConfirmed = confirmedAt[orderId];
+    if (!tConfirmed || tConfirmed > tReady) continue; // can't compute
+    const order = orderById.get(orderId);
+    if (!order) continue;
+    const key = order.binding_type;
+    if (!buckets[key]) buckets[key] = { hours: [], copies: [] };
+    buckets[key].hours.push((tReady - tConfirmed) / (1000 * 60 * 60));
+    buckets[key].copies.push(order.quantity || 1);
+  }
+
+  const result: TurnaroundEntry[] = [];
+  for (const [binding, { hours, copies }] of Object.entries(buckets)) {
+    const totalHours = hours.reduce((a, b) => a + b, 0);
+    const totalCopies = copies.reduce((a, b) => a + b, 0);
+    const sorted = [...hours].sort((a, b) => a - b);
+    const median = sorted.length % 2
+      ? sorted[Math.floor(sorted.length / 2)]
+      : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+    result.push({
+      binding_type: binding,
+      orders: hours.length,
+      totalCopies,
+      avgHoursPerOrder: totalHours / hours.length,
+      avgHoursPerCopy: totalCopies > 0 ? totalHours / totalCopies : 0,
+      medianHoursPerOrder: median,
+    });
+  }
+  return result.sort((a, b) => b.orders - a.orders);
+}
+
+function humanise(hours: number): string {
+  if (!isFinite(hours) || hours <= 0) return '—';
+  if (hours < 1) return `${Math.round(hours * 60)} min`;
+  if (hours < 24) return `${hours.toFixed(1)} hrs`;
+  const days = hours / 24;
+  return `${days.toFixed(1)} days`;
 }

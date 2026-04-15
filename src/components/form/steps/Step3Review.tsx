@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { UploadedFileMeta, Step1Values, BookSpecValues, PrintSpecValues } from '../schemas';
-import { BINDING_LABELS } from '../schemas';
+import { BINDING_LABELS, DELIVERY_LABELS } from '../schemas';
 import { titleCase, formatDate } from '@/lib/utils';
 
 interface Props {
@@ -29,7 +29,7 @@ export function Step3Review({ contact, bookSpec, printSpec, files }: Props) {
           <Row k="Print type" v={contact.binding_type === 'other' ? contact.binding_type_other ?? '—' : BINDING_LABELS[contact.binding_type]} />
           <Row k="Quantity" v={String(contact.quantity)} />
           <Row k="Required by" v={formatDate(contact.delivery_date)} />
-          <Row k="Delivery" v={titleCase(contact.delivery_method)} />
+          <Row k="Delivery" v={DELIVERY_LABELS[contact.delivery_method]} />
           {contact.delivery_method === 'courier' && <Row k="Address" v={contact.delivery_address ?? ''} />}
           {contact.special_instructions && <Row k="Notes" v={contact.special_instructions} />}
         </CardContent>

@@ -4,8 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Step1Values } from '../schemas';
-import { BINDING_OPTIONS_PUBLIC, BINDING_LABELS, DELIVERY_METHODS } from '../schemas';
-import { titleCase } from '@/lib/utils';
+import { BINDING_OPTIONS_PUBLIC, BINDING_LABELS, DELIVERY_METHODS, DELIVERY_LABELS } from '../schemas';
 
 export function Step1Contact() {
   const form = useFormContext<Step1Values>();
@@ -59,7 +58,7 @@ export function Step1Contact() {
             <SelectTrigger><SelectValue placeholder="Choose method…" /></SelectTrigger>
             <SelectContent>
               {DELIVERY_METHODS.map((m) => (
-                <SelectItem key={m} value={m}>{titleCase(m)}</SelectItem>
+                <SelectItem key={m} value={m}>{DELIVERY_LABELS[m]}</SelectItem>
               ))}
             </SelectContent>
           </Select>

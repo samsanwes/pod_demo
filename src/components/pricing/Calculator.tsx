@@ -20,18 +20,25 @@ export function Calculator({ order, onUpdated }: Props) {
   const [margin, setMargin] = useState(order.margin_percent);
   const [inflation, setInflation] = useState(order.inflation_percent);
   const [discount, setDiscount] = useState(order.discount_percent ?? 0);
+  const [shipping, setShipping] = useState<string>(
+    order.shipping_charge != null ? String(order.shipping_charge) : ''
+  );
   const [running, setRunning] = useState(false);
 
   const bd = order.price_breakdown;
   const canEdit = role === 'manager';
+  const isCourier = order.delivery_method === 'courier';
 
   async function runCalc() {
     setRunning(true);
     try {
+      const shippingValue = shipping === '' ? null : parseFloat(shipping) || 0;
       await supabase.from('orders').update({
         margin_percent: margin,
         inflation_percent: inflation,
         discount_percent: discount,
+        // Only persist a per-order override when courier. Pickup ignores shipping.
+        shipping_charge: isCourier ? shippingValue : null,
       }).eq('id', order.id);
 
       const { data, error } = await supabase.functions.invoke('calculate-price', {
@@ -77,6 +84,22 @@ export function Calculator({ order, onUpdated }: Props) {
             <Input type="number" step="0.5" value={discount} onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)} disabled={!canEdit} />
             <p className="mt-1 text-xs text-muted-foreground">Applied per copy before totalling.</p>
           </div>
+          {isCourier && (
+            <div>
+              <Label>Shipping charge (₹)</Label>
+              <Input
+                type="number"
+                step="1"
+                value={shipping}
+                onChange={(e) => setShipping(e.target.value)}
+                placeholder="Leave blank to use default"
+                disabled={!canEdit}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Override for this order. Blank = use Rate card default.
+              </p>
+            </div>
+          )}
           <Button onClick={runCalc} disabled={!canEdit || running} className="w-full">
             {running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalcIcon className="mr-2 h-4 w-4" />}
             {running ? 'Calculating…' : 'Calculate price'}
@@ -85,11 +108,6 @@ export function Calculator({ order, onUpdated }: Props) {
             Rate card values are snapshotted into <code>price_breakdown</code> each time you calculate, so quotes
             stay stable even if rates change later.
           </p>
-          {order.delivery_method === 'courier' && (
-            <p className="text-xs text-muted-foreground">
-              Courier delivery — shipping charge from pricing settings will be added to the total.
-            </p>
-          )}
         </CardContent>
       </Card>
 
