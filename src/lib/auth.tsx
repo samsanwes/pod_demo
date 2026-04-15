@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import type { UserRole, UserRow } from './database.types';
@@ -20,14 +20,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserRow | null>(null);
   const [loading, setLoading] = useState(true);
-  const lastLoadedUserId = useRef<string | null>(null);
 
-  async function loadProfile(userId: string) {
-    // Deduplicate repeated calls for the same user (onAuthStateChange fires
-    // for TOKEN_REFRESHED, USER_UPDATED, etc. — no need to re-fetch every time).
-    if (lastLoadedUserId.current === userId) return;
-    lastLoadedUserId.current = userId;
-
+  const loadProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('users')
       .select('*')
@@ -41,24 +35,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(data ? (data as UserRow) : null);
 
     // Seed the audit-user session var so the DB trigger can attribute changes.
-    // This is a fire-and-forget; don't block the UI on it.
+    // Fire-and-forget — never block the UI on this.
     supabase.rpc('set_audit_user', { uid: userId }).then(
       () => {},
       (err) => console.warn('[auth] set_audit_user failed (non-fatal)', err)
     );
-  }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    // Initial hydrate from cached session
     supabase.auth.getSession().then(async ({ data }) => {
       if (cancelled) return;
       setSession(data.session);
       if (data.session?.user) {
         await loadProfile(data.session.user.id);
       }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, sess) => {
@@ -67,17 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (sess?.user) {
         await loadProfile(sess.user.id);
       } else {
-        lastLoadedUserId.current = null;
         setProfile(null);
       }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     });
 
     return () => {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [loadProfile]);
 
   const value: AuthCtx = {
     session,
@@ -90,15 +82,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
     },
     async signOut() {
-      lastLoadedUserId.current = null;
       setProfile(null);
       await supabase.auth.signOut();
     },
     async refresh() {
-      if (session?.user) {
-        lastLoadedUserId.current = null;
-        await loadProfile(session.user.id);
-      }
+      if (session?.user) await loadProfile(session.user.id);
     },
   };
 
