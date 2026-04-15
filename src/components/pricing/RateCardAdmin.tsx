@@ -58,6 +58,12 @@ const SCHEMAS: Record<TableName, { label: string; columns: ColumnDef[] }> = {
     columns: [
       { key: 'name', label: 'Name', required: true },
       { key: 'cost_per_copy', label: 'Cost / copy', type: 'number', step: 0.01, required: true },
+      {
+        key: 'binding_type',
+        label: 'Applies to',
+        type: 'select',
+        options: ['__all__', 'perfect', 'saddle', 'wiro', 'comb', 'document', 'other'],
+      },
     ],
   },
   imposition_rules: {
@@ -146,7 +152,11 @@ function RateTable({ table }: { table: TableName }) {
             {rows.map((r) => (
               <TableRow key={r.id}>
                 {schema.columns.map((c) => (
-                  <TableCell key={c.key}>{String(r[c.key] ?? '—')}</TableCell>
+                  <TableCell key={c.key}>
+                    {c.key === 'binding_type' && !r[c.key]
+                      ? <span className="text-muted-foreground">All bindings</span>
+                      : String(r[c.key] ?? '—')}
+                  </TableCell>
                 ))}
                 <TableCell>{r.is_active === false && <Badge variant="muted">inactive</Badge>}</TableCell>
                 <TableCell className="space-x-1 text-right">
@@ -173,7 +183,16 @@ function RateTable({ table }: { table: TableName }) {
 function EditDialog({ table, row, onClose }: { table: TableName; row: Row | null; onClose: () => void }) {
   const schema = SCHEMAS[table];
   const [values, setValues] = useState<Record<string, unknown>>(() => {
-    if (row) return { ...row };
+    if (row) {
+      const copy: Record<string, unknown> = { ...row };
+      // Map stored NULL back to the "__all__" sentinel so the Select shows something
+      for (const c of schema.columns) {
+        if (c.type === 'select' && copy[c.key] == null && c.options?.includes('__all__')) {
+          copy[c.key] = '__all__';
+        }
+      }
+      return copy;
+    }
     const init: Record<string, unknown> = {};
     for (const c of schema.columns) init[c.key] = c.type === 'number' ? 0 : c.options ? c.options[0] : '';
     return init;
@@ -192,6 +211,10 @@ function EditDialog({ table, row, onClose }: { table: TableName; row: Row | null
           setBusy(false);
           return;
         }
+        // Empty string → NULL for optional select columns (e.g. overhead.binding_type = "All bindings")
+        if (!c.required && v === '') v = null;
+        // "__all__" sentinel → NULL for the overhead.binding_type column
+        if (v === '__all__') v = null;
         payload[c.key] = v;
       }
       if (row) {
@@ -222,7 +245,9 @@ function EditDialog({ table, row, onClose }: { table: TableName; row: Row | null
                 <Select value={String(values[c.key] ?? '')} onValueChange={(v) => setValues({ ...values, [c.key]: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {c.options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                    {c.options.map((o) => (
+                      <SelectItem key={o} value={o}>{o === '__all__' ? 'All bindings' : o}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               ) : (
@@ -251,6 +276,8 @@ function EditDialog({ table, row, onClose }: { table: TableName; row: Row | null
 function PricingSettingsCard() {
   const [margin, setMargin] = useState('30');
   const [inflation, setInflation] = useState('9');
+  const [defaultDiscount, setDefaultDiscount] = useState('0');
+  const [shippingCharge, setShippingCharge] = useState('0');
   const [id, setId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -259,8 +286,10 @@ function PricingSettingsCard() {
       const { data } = await supabase.from('pricing_settings').select('*').limit(1).maybeSingle();
       if (data) {
         setId(data.id as string);
-        setMargin(String(data.margin_percent));
-        setInflation(String(data.inflation_percent));
+        setMargin(String(data.margin_percent ?? 30));
+        setInflation(String(data.inflation_percent ?? 9));
+        setDefaultDiscount(String(data.default_discount_percent ?? 0));
+        setShippingCharge(String(data.shipping_charge ?? 0));
       }
     })();
   }, []);
@@ -268,7 +297,12 @@ function PricingSettingsCard() {
   async function save() {
     setBusy(true);
     try {
-      const payload = { margin_percent: parseFloat(margin), inflation_percent: parseFloat(inflation) };
+      const payload = {
+        margin_percent: parseFloat(margin) || 0,
+        inflation_percent: parseFloat(inflation) || 0,
+        default_discount_percent: parseFloat(defaultDiscount) || 0,
+        shipping_charge: parseFloat(shippingCharge) || 0,
+      };
       if (id) {
         await supabase.from('pricing_settings').update(payload).eq('id', id);
       } else {
@@ -283,8 +317,14 @@ function PricingSettingsCard() {
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Default margin & inflation</CardTitle></CardHeader>
-      <CardContent className="grid max-w-md gap-3 md:grid-cols-2">
+      <CardHeader>
+        <CardTitle className="text-base">Pricing settings</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          These are the defaults used when a new order is calculated. Individual orders can still
+          override margin / inflation / discount in the pricing calculator.
+        </p>
+      </CardHeader>
+      <CardContent className="grid max-w-2xl gap-3 md:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Margin %</Label>
           <Input type="number" step="0.5" value={margin} onChange={(e) => setMargin(e.target.value)} />
@@ -292,6 +332,15 @@ function PricingSettingsCard() {
         <div className="space-y-1.5">
           <Label>Inflation %</Label>
           <Input type="number" step="0.5" value={inflation} onChange={(e) => setInflation(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Default discount %</Label>
+          <Input type="number" step="0.5" value={defaultDiscount} onChange={(e) => setDefaultDiscount(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Courier shipping charge (₹, flat)</Label>
+          <Input type="number" step="1" value={shippingCharge} onChange={(e) => setShippingCharge(e.target.value)} />
+          <p className="text-xs text-muted-foreground">Added to orders where delivery method = courier.</p>
         </div>
         <div className="md:col-span-2">
           <Button onClick={save} disabled={busy}>

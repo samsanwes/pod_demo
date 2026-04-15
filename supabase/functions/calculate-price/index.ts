@@ -1,9 +1,15 @@
 // Calculate price for an order using the rate card.
-// Applies spec §7 formula:
-//   Unit Cost = paper_text + paper_cover + print_text + print_cover + binding + lamination + overhead
-//   Price/Copy = Unit Cost / (1 - margin%)
-//   Total/Copy = Price/Copy * (1 + inflation%)
-//   Order Total = Total/Copy * quantity
+//
+// Spec §7 formula, extended per Apr-2026 requests:
+//   Unit Cost      = paper_text + paper_cover + print_text + print_cover
+//                    + binding + lamination + overhead_components
+//                    (overhead_components = overhead_costs rows where binding_type
+//                     is NULL OR matches order.binding_type)
+//   Price/Copy     = Unit Cost / (1 - margin%)
+//   After Inflate  = Price/Copy * (1 + inflation%)
+//   After Discount = After Inflate * (1 - discount%)
+//   Subtotal       = After Discount * quantity
+//   Total          = ROUND( Subtotal + (shipping_charge if courier) )   — to whole rupees
 //
 // @ts-expect-error Deno runtime
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
@@ -30,8 +36,10 @@ interface Order {
   paper_size: string | null;
   printing_type: ('bw' | 'colour')[] | null;
   printing_sides: string | null;
+  delivery_method: 'pickup' | 'courier';
   margin_percent: number;
   inflation_percent: number;
+  discount_percent: number;
 }
 
 const NOT_SURE = 'Not sure — please recommend';
@@ -65,20 +73,27 @@ serve(async (req) => {
     if (orderErr || !orderData) return json({ error: orderErr?.message ?? 'Order not found' }, 404);
     const order = orderData as Order;
 
-    // Fetch active rate card
-    const [papersRes, printersRes, lamRes, overheadRes, imposRes] = await Promise.all([
+    // Fetch active rate card + pricing settings
+    const [papersRes, printersRes, lamRes, overheadRes, imposRes, settingsRes] = await Promise.all([
       admin.from('paper_types').select('*').eq('is_active', true),
       admin.from('printer_rates').select('*').eq('is_active', true),
       admin.from('lamination_types').select('*').eq('is_active', true),
       admin.from('overhead_costs').select('*').eq('is_active', true),
       admin.from('imposition_rules').select('*'),
+      admin.from('pricing_settings').select('*').limit(1).maybeSingle(),
     ]);
 
     const papers = (papersRes.data ?? []) as Array<{ name: string; gsm: number; usage: string; price_per_sheet: number }>;
     const printers = (printersRes.data ?? []) as Array<{ colour_mode: string; paper_size: string; price_per_sheet: number }>;
     const lams = (lamRes.data ?? []) as Array<{ name: string; roll_price: number }>;
-    const overheads = (overheadRes.data ?? []) as Array<{ name: string; cost_per_copy: number }>;
+    const allOverheads = (overheadRes.data ?? []) as Array<{ name: string; cost_per_copy: number; binding_type: string | null }>;
     const imposs = (imposRes.data ?? []) as Array<{ trim_size: string; printer_paper_size: string; pages_per_sheet: number }>;
+    const settings = (settingsRes.data ?? {}) as { shipping_charge?: number };
+
+    // Only overheads where binding_type is NULL (applies-to-all) OR matches the order's binding.
+    const overheads = allOverheads.filter(
+      (o) => o.binding_type == null || o.binding_type === order.binding_type
+    );
 
     const components: Record<string, number> = {};
 
@@ -86,92 +101,97 @@ serve(async (req) => {
     if (['perfect', 'saddle'].includes(order.binding_type)) {
       const pages = order.num_pages ?? 0;
       const trim = order.trim_size ?? 'A5';
-      const printerPaperSize = 'A3'; // default; could be looked up from paper_type config
+      const printerPaperSize = 'A3';
       const impos = imposs.find((i) => i.trim_size === trim && i.printer_paper_size === printerPaperSize);
       const pagesPerSheet = impos?.pages_per_sheet ?? 4;
       const sheetsPerCopy = Math.ceil(pages / pagesPerSheet);
 
-      // Text paper cost. "Not sure" falls back to any active text paper.
       const textPref = order.paper_type === NOT_SURE ? null : order.paper_type;
       const matchedTextPaper = matchPaper(papers, textPref, 'text');
       if (matchedTextPaper) {
         components.paper_text = sheetsPerCopy * matchedTextPaper.price_per_sheet;
       }
-      // Cover paper (assume 1 sheet cover). Honor explicit client choice when set.
       const coverPref = order.cover_paper_type === NOT_SURE ? null : order.cover_paper_type;
       const coverPaper = matchPaper(papers, coverPref, 'cover');
       if (coverPaper) components.paper_cover = coverPaper.price_per_sheet;
 
-      // Printing (inner)
       const innerPrint = printers.find(
         (p) => p.colour_mode === (order.inner_printing ?? 'bw') && p.paper_size === printerPaperSize
       );
       if (innerPrint) components.print_text = sheetsPerCopy * innerPrint.price_per_sheet;
 
-      // Printing (cover)
       const coverPrint = printers.find(
         (p) => p.colour_mode === (order.cover_printing ?? 'colour') && p.paper_size === printerPaperSize
       );
       if (coverPrint) components.print_cover = coverPrint.price_per_sheet;
 
-      // Lamination
       if (order.cover_lamination && order.cover_lamination !== 'none') {
         const lam = lams.find((l) => l.name.toLowerCase() === order.cover_lamination);
-        // Very simple model: amortize roll price over ~200 covers
         if (lam) components.lamination = lam.roll_price / 200;
       }
 
-      // Binding per-copy (flat; use overhead 'Binding' if present else default)
-      const bindingOverhead = overheads.find((o) => o.name.toLowerCase() === 'binding');
-      components.binding = bindingOverhead?.cost_per_copy ?? 8.0;
+      // Fallback binding cost — only used if no overhead row named "binding" exists for this binding type.
+      if (!overheads.find((o) => o.name.toLowerCase() === 'binding')) {
+        components.binding = order.binding_type === 'perfect' ? 8.0 : 3.0;
+      }
     } else {
-      // --- Non-book print jobs (saddle/wiro/comb/document/other) ---
-      const sheetsPerCopy = order.printing_sides === 'double' ? Math.ceil((order.num_pages ?? 1) / 2) : order.num_pages ?? 1;
+      // --- Non-book print jobs ---
+      const sheetsPerCopy = order.printing_sides === 'double'
+        ? Math.ceil((order.num_pages ?? 1) / 2)
+        : order.num_pages ?? 1;
       const size = order.paper_size ?? 'A4';
 
-      // Use first matching text paper for size
       const paper = papers.find((p) => p.usage === 'text') ?? papers[0];
       if (paper) components.paper_text = sheetsPerCopy * paper.price_per_sheet;
 
-      // Printing — sum each requested colour mode
       for (const mode of order.printing_type ?? ['bw']) {
         const p = printers.find((r) => r.colour_mode === mode && r.paper_size === size);
         if (p) components[`print_${mode}`] = sheetsPerCopy * p.price_per_sheet;
       }
 
-      // Light binding for wiro/comb
-      if (['wiro', 'comb'].includes(order.binding_type)) {
+      if (['wiro', 'comb'].includes(order.binding_type) &&
+          !overheads.find((o) => o.name.toLowerCase() === 'binding')) {
         components.binding = 15.0;
       }
     }
 
-    // Overheads (cutting, labour, machinery, admin)
+    // Binding-scoped overheads (cutting, labour, admin, or binding-specific ones).
     for (const oh of overheads) {
-      if (!components[oh.name.toLowerCase()]) {
-        components[oh.name.toLowerCase()] = oh.cost_per_copy;
+      const key = oh.name.toLowerCase().replace(/\s+/g, '_');
+      if (!components[key]) {
+        components[key] = oh.cost_per_copy;
       }
     }
 
     const unitCost = Object.values(components).reduce((a, b) => a + b, 0);
     const margin = Number(order.margin_percent ?? 30);
     const inflation = Number(order.inflation_percent ?? 9);
+    const discount = Number(order.discount_percent ?? 0);
+    const shippingCharge = order.delivery_method === 'courier'
+      ? Number(settings.shipping_charge ?? 0)
+      : 0;
 
     const marginDenom = Math.max(0.0001, 1 - margin / 100);
-    const pricePerCopyBeforeInflation = unitCost / marginDenom;
-    const pricePerCopy = pricePerCopyBeforeInflation * (1 + inflation / 100);
-    const totalPrice = pricePerCopy * order.quantity;
+    const pricePerCopyBeforeDiscount = (unitCost / marginDenom) * (1 + inflation / 100);
+    const pricePerCopy = pricePerCopyBeforeDiscount * (1 - discount / 100);
+    const subtotal = pricePerCopy * order.quantity;
+    const totalRaw = subtotal + shippingCharge;
+    const totalPrice = Math.round(totalRaw); // whole rupees
 
     const breakdown = {
       unit_cost: round2(unitCost),
       components: Object.fromEntries(Object.entries(components).map(([k, v]) => [k, round2(v)])),
       margin_percent: margin,
       inflation_percent: inflation,
-      price_per_copy: round2(pricePerCopy),
-      total_price: round2(totalPrice),
+      discount_percent: discount,
+      price_per_copy: round2(pricePerCopyBeforeDiscount),
+      price_per_copy_after_discount: round2(pricePerCopy),
+      shipping_charge: round2(shippingCharge),
+      subtotal: round2(subtotal),
+      total_price: totalPrice,
       quantity: order.quantity,
-      rate_card_snapshot: {
-        papers, printers, lams, overheads, imposs,
-      },
+      delivery_method: order.delivery_method,
+      rate_card_snapshot: { papers, printers, lams, overheads: allOverheads, imposs, settings },
       calculated_at: new Date().toISOString(),
     };
 
@@ -180,7 +200,7 @@ serve(async (req) => {
       .update({
         unit_production_cost: round2(unitCost),
         price_per_copy: round2(pricePerCopy),
-        total_price: round2(totalPrice),
+        total_price: totalPrice,
         price_breakdown: breakdown,
       })
       .eq('id', orderId);

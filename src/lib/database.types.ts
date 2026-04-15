@@ -66,6 +66,7 @@ export interface OrderRow {
   unit_production_cost: number | null;
   margin_percent: number;
   inflation_percent: number;
+  discount_percent: number;
   price_per_copy: number | null;
   total_price: number | null;
   price_breakdown: PriceBreakdown | null;
@@ -90,9 +91,14 @@ export interface PriceBreakdown {
   components: Record<string, number>;
   margin_percent: number;
   inflation_percent: number;
+  discount_percent: number;
   price_per_copy: number;
+  price_per_copy_after_discount: number;
+  shipping_charge: number;
+  subtotal: number;
   total_price: number;
   quantity: number;
+  delivery_method?: string;
   rate_card_snapshot?: Record<string, unknown>;
   calculated_at: string;
 }
@@ -166,6 +172,7 @@ export interface OverheadCost {
   id: string;
   name: string;
   cost_per_copy: number;
+  binding_type: BindingType | null;
   is_active: boolean;
   updated_at: string;
 }
@@ -174,6 +181,8 @@ export interface PricingSettings {
   id: string;
   margin_percent: number;
   inflation_percent: number;
+  shipping_charge: number;
+  default_discount_percent: number;
   updated_at: string;
 }
 
