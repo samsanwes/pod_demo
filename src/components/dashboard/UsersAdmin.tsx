@@ -16,6 +16,36 @@ import { toast } from '@/hooks/use-toast';
 
 const ROLES: UserRole[] = ['manager', 'production', 'bookstore'];
 
+/**
+ * Invoke a Supabase edge function and surface the function's actual error
+ * message on failure — instead of the generic "Edge Function returned a
+ * non-2xx status code" that supabase.functions.invoke defaults to.
+ */
+async function invokeFunction(name: string, body: unknown): Promise<unknown> {
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${name}`;
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token ?? anonKey;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let json: unknown;
+  try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
+  if (!res.ok) {
+    const msg = (json as { error?: string }).error ?? `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return json;
+}
+
 export function UsersAdmin() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -138,10 +168,7 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
     if (!name.trim() || !email.trim()) return;
     setBusy(true);
     try {
-      const { error } = await supabase.functions.invoke('create-user', {
-        body: { name, email, role },
-      });
-      if (error) throw error;
+      await invokeFunction('create-user', { name, email, role });
       toast({ title: 'User created', description: 'A magic-link invitation has been emailed.' });
       onClose();
     } catch (err) {
@@ -196,10 +223,7 @@ function DeleteUserDialog({ user, onClose }: { user: UserRow; onClose: (deleted:
   async function remove() {
     setBusy(true);
     try {
-      const { error } = await supabase.functions.invoke('delete-user', {
-        body: { user_id: user.id },
-      });
-      if (error) throw error;
+      await invokeFunction('delete-user', { user_id: user.id });
       toast({ title: 'User deleted', description: `${user.name} (${user.email}) removed.` });
       onClose(true);
     } catch (err) {
