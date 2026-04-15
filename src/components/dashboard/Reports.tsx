@@ -255,15 +255,6 @@ export function Reports() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Production turnaround by print type — {PERIOD_LABEL[period]}</CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Time from <em>In production</em> to <em>Ready</em>, grouped by binding option. An order
-            counts here if its <em>Ready</em> transition falls in the selected period, even if it
-            was submitted earlier. If an order skipped the <em>In production</em> stage (e.g. a
-            manager jumped directly to <em>Ready</em>), the order's submission time is used as a
-            fallback start. <strong>Per-order</strong> shows raw hours; <strong>per-copy</strong>
-            normalises for run size — useful when comparing binding types that typically have very
-            different quantities.
-          </p>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
