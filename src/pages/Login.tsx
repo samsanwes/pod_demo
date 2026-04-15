@@ -16,8 +16,8 @@ export function LoginPage() {
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? '/dashboard';
 
-  // If the user is already signed in, bounce them to the dashboard.
-  // Doing this in useEffect (not during render) avoids infinite re-render loops.
+  // If the user is ALREADY signed in when they hit /login, bounce them.
+  // Done in useEffect (not during render) so we don't update during render.
   useEffect(() => {
     if (session && !loading) {
       navigate(from, { replace: true });
@@ -30,9 +30,9 @@ export function LoginPage() {
     setBusy(true);
     try {
       await signIn(email, password);
-      // The useEffect above will pick up the new session and navigate.
-      // We fall through here; setBusy(false) keeps the button from getting stuck
-      // if navigation is somehow delayed.
+      // Navigate directly — don't rely on the useEffect above racing the state update.
+      // React Router handles the unmount and busy state becomes irrelevant.
+      navigate(from, { replace: true });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign-in failed';
       toast({ variant: 'destructive', title: 'Sign in failed', description: message });
