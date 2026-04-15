@@ -140,12 +140,19 @@ export function OrderForm() {
         if (filesErr) throw filesErr;
       }
 
-      // Ask the edge function to assign POD-YYYY-NNNN
+      // Ask the edge function to assign POD-YYYY-NNNN.
+      // Time-box this so a slow edge-function cold start doesn't hang submission.
+      // If we time out, the order is already saved with status=new and the manager
+      // can still run the function later via the dashboard.
       let orderNumber = orderId.slice(0, 8);
       try {
-        const { data: fnData } = await supabase.functions.invoke('generate-order-number', {
-          body: { order_id: orderId },
-        });
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 8000)
+        );
+        const call = supabase.functions
+          .invoke('generate-order-number', { body: { order_id: orderId } })
+          .then((r) => r as { data: unknown; error: unknown });
+        const { data: fnData } = (await Promise.race([call, timeout])) as { data: unknown };
         if (fnData && typeof fnData === 'object' && 'order_number' in fnData) {
           orderNumber = String((fnData as { order_number: string }).order_number);
         }

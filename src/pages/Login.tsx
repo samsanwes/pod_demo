@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -16,20 +16,26 @@ export function LoginPage() {
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? '/dashboard';
 
-  if (session && !loading) {
-    navigate(from, { replace: true });
-  }
+  // If the user is already signed in, bounce them to the dashboard.
+  // Doing this in useEffect (not during render) avoids infinite re-render loops.
+  useEffect(() => {
+    if (session && !loading) {
+      navigate(from, { replace: true });
+    }
+  }, [session, loading, from, navigate]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (busy) return;
     setBusy(true);
     try {
       await signIn(email, password);
-      navigate(from, { replace: true });
+      // The useEffect above will pick up the new session and navigate.
+      // We fall through here; setBusy(false) keeps the button from getting stuck
+      // if navigation is somehow delayed.
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign-in failed';
       toast({ variant: 'destructive', title: 'Sign in failed', description: message });
-    } finally {
       setBusy(false);
     }
   }
