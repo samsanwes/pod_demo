@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, Pause, Play } from 'lucide-react';
+import { Loader2, Pause, Play, CheckCircle2, Clock } from 'lucide-react';
 import type { OrderRow, ProductionStatus } from '@/lib/database.types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +12,10 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { toast } from '@/hooks/use-toast';
 
-const PROD_STATUSES: ProductionStatus[] = [
+// Production selects from the sub-statuses up to and including 'sample_approval'.
+// Once at 'sample_approval' they're blocked — only the manager can advance
+// to 'full_production' via the "Approve sample" button.
+const PROD_STATUSES_FOR_PRODUCTION: ProductionStatus[] = [
   'not_started', 'started', 'in_progress', 'sample_approval', 'full_production', 'completed',
 ];
 
@@ -27,7 +30,18 @@ export function ProductionTab({ order, onUpdated }: Props) {
   const [holdReason, setHoldReason] = useState('');
   const [nextProd, setNextProd] = useState<ProductionStatus>(order.production_status ?? 'not_started');
 
-  const canEdit = role === 'manager' || role === 'production';
+  const isAwaitingSampleApproval = order.production_status === 'sample_approval';
+  const isManager = role === 'manager';
+  const isProduction = role === 'production';
+
+  // Production can only self-advance up to sample_approval. After that, manager must approve.
+  const prodAllowedNext: ProductionStatus[] = isManager
+    ? PROD_STATUSES_FOR_PRODUCTION
+    : ['not_started', 'started', 'in_progress', 'sample_approval', 'completed'];
+  // If production already requested sample approval, they shouldn't advance anywhere until manager OK's.
+  const productionIsBlocked = isProduction && isAwaitingSampleApproval;
+
+  const canEdit = (isManager || isProduction) && !productionIsBlocked;
   const canEditStatus = canEdit && !order.is_on_hold && ['confirmed', 'in_production', 'ready'].includes(order.status);
 
   async function updateOrder(patch: Partial<OrderRow>) {
@@ -56,6 +70,11 @@ export function ProductionTab({ order, onUpdated }: Props) {
     await updateOrder(patch);
   }
 
+  async function approveSample() {
+    await updateOrder({ production_status: 'full_production' });
+    toast({ title: 'Sample approved', description: 'Production can now resume.' });
+  }
+
   async function placeHold() {
     if (!holdReason.trim() || !user) return;
     setBusy(true);
@@ -77,7 +96,6 @@ export function ProductionTab({ order, onUpdated }: Props) {
     if (!user) return;
     setBusy(true);
     try {
-      // Find the open hold and mark it resumed
       const { data: open } = await supabase
         .from('order_holds')
         .select('*')
@@ -101,6 +119,31 @@ export function ProductionTab({ order, onUpdated }: Props) {
 
   return (
     <div className="grid gap-4">
+      {/* Sample-approval gate */}
+      {isAwaitingSampleApproval && (
+        <Card className="border-brand-gold/50 bg-brand-gold/10">
+          <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-3">
+              <Clock className="mt-0.5 h-5 w-5 shrink-0 text-brand-foundations" />
+              <div>
+                <div className="font-semibold text-brand-foundations">Awaiting sample approval</div>
+                <div className="text-sm text-muted-foreground">
+                  {isManager
+                    ? 'Production has reached the sample approval stage. Share the sample with the client, then click Approve to resume production.'
+                    : 'Manager will check the sample with the client before you continue. You\'ll see the status change when they approve.'}
+                </div>
+              </div>
+            </div>
+            {isManager && (
+              <Button onClick={approveSample} disabled={busy} className="shrink-0">
+                {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                Approve sample
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Production status</CardTitle>
@@ -113,11 +156,11 @@ export function ProductionTab({ order, onUpdated }: Props) {
               <div className="text-muted-foreground">{order.hold_reason}</div>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Select value={nextProd} onValueChange={(v) => setNextProd(v as ProductionStatus)} disabled={!canEditStatus}>
-                <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[220px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PROD_STATUSES.map((s) => (
+                  {prodAllowedNext.map((s) => (
                     <SelectItem key={s} value={s}>{titleCase(s)}</SelectItem>
                   ))}
                 </SelectContent>
@@ -135,7 +178,7 @@ export function ProductionTab({ order, onUpdated }: Props) {
         <CardHeader><CardTitle className="text-base">Hold / resume</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {order.is_on_hold ? (
-            <Button onClick={resume} disabled={!canEdit || busy}>
+            <Button onClick={resume} disabled={!(isManager || isProduction) || busy}>
               <Play className="mr-2 h-4 w-4" />
               Resume production
             </Button>
@@ -143,9 +186,9 @@ export function ProductionTab({ order, onUpdated }: Props) {
             <>
               <div className="space-y-1.5">
                 <Label>Reason for hold</Label>
-                <Textarea value={holdReason} onChange={(e) => setHoldReason(e.target.value)} rows={2} placeholder="e.g. waiting on client approval of sample" disabled={!canEdit} />
+                <Textarea value={holdReason} onChange={(e) => setHoldReason(e.target.value)} rows={2} placeholder="e.g. waiting on client approval of sample" disabled={!(isManager || isProduction)} />
               </div>
-              <Button variant="accent" onClick={placeHold} disabled={!canEdit || !holdReason.trim() || busy}>
+              <Button variant="accent" onClick={placeHold} disabled={!(isManager || isProduction) || !holdReason.trim() || busy}>
                 <Pause className="mr-2 h-4 w-4" />
                 Place on hold
               </Button>
