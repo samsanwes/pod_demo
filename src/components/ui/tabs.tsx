@@ -8,14 +8,19 @@ export const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
 >(({ className, ...props }, ref) => (
-  <TabsPrimitive.List
-    ref={ref}
-    className={cn(
-      'inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground',
-      className
-    )}
-    {...props}
-  />
+  // The parent wrapper lets the tab strip scroll horizontally on narrow
+  // viewports instead of clipping (order detail has 7 tabs — doesn't fit on a
+  // 360px screen). Scrollbar is hidden visually; swipe/drag still works.
+  <div className="-mx-1 overflow-x-auto px-1 scrollbar-none">
+    <TabsPrimitive.List
+      ref={ref}
+      className={cn(
+        'inline-flex h-10 w-max items-center justify-center rounded-md bg-muted p-1 text-muted-foreground',
+        className
+      )}
+      {...props}
+    />
+  </div>
 ));
 TabsList.displayName = TabsPrimitive.List.displayName;
 

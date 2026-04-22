@@ -9,9 +9,13 @@ interface LogoProps {
   variant?: 'primary' | 'inverse';
   /** When true, shows just the square logomark (no wordmark). */
   markOnly?: boolean;
-  className?: string;
-  /** Pixel height. Width follows the SVG's natural aspect ratio. */
+  /**
+   * Pixel height. Width follows the SVG's natural aspect ratio.
+   * Prefer using className (e.g. `h-12 md:h-16`) for responsive sizing —
+   * className beats the pixel size when provided.
+   */
   size?: number;
+  className?: string;
 }
 
 /**
@@ -25,19 +29,24 @@ interface LogoProps {
  *  - No rotation, stretching, or cropping (rendered at natural aspect ratio).
  *  - Clear space ≥ height of the pillar (wrap with padding or CSS as needed).
  *  - No gradients or shadows (no filter classes applied).
+ *
+ * Sizing: pass a Tailwind height class via `className` (e.g. `h-14 md:h-20`)
+ * for responsive layouts. The `size` prop sets a fallback pixel height —
+ * when a Tailwind `h-*` class is present, Tailwind's CSS height wins.
  */
 export function Logo({ variant = 'primary', markOnly = false, className, size = 64 }: LogoProps) {
   const src = markOnly
     ? variant === 'primary' ? logoMarkPrimary : logoMarkWhite
     : variant === 'primary' ? wordmarkFoundations : wordmarkWhite;
 
+  const hasHeightClass = className ? /\bh-/.test(className) : false;
+
   return (
     <img
       src={src}
       alt="SAIACS — South Asia Institute of Advanced Christian Studies"
-      height={size}
-      className={cn('block shrink-0 select-none', className)}
-      style={{ height: size, width: 'auto' }}
+      className={cn('block w-auto shrink-0 select-none', className)}
+      style={hasHeightClass ? undefined : { height: size }}
       draggable={false}
     />
   );

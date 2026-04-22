@@ -78,18 +78,18 @@ export function OrderDetail() {
         </Link>
       </div>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-bold">
-            {order.order_number ?? order.id.slice(0, 8)}
+      <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-start md:justify-between">
+        <div className="min-w-0">
+          <h1 className="font-display text-xl font-bold sm:text-2xl">
+            <span className="break-all">{order.order_number ?? order.id.slice(0, 8)}</span>
             {order.title && (
-              <span className="ml-3 text-lg font-normal text-muted-foreground">— {order.title}</span>
+              <span className="ml-2 text-base font-normal text-muted-foreground sm:ml-3 sm:text-lg">— {order.title}</span>
             )}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            {order.client_name} · {order.client_organization}
+          <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+            <span className="truncate">{order.client_name} · {order.client_organization}</span>
             {order.order_source !== 'public' && (
-              <span className="ml-2 rounded bg-brand-gold/30 px-2 py-0.5 text-xs font-medium text-brand-foundations">
+              <span className="rounded bg-brand-gold/30 px-2 py-0.5 text-xs font-medium text-brand-foundations">
                 {titleCase(order.order_source)}
               </span>
             )}
@@ -105,7 +105,7 @@ export function OrderDetail() {
           )}
           {role === 'manager' && (
             <Select value={order.status} onValueChange={(v) => changeStatus(v as OrderStatus)}>
-              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {MANAGER_NEXT_STATUSES.map((s) => (
                   <SelectItem key={s} value={s}>{titleCase(s)}</SelectItem>

@@ -70,10 +70,10 @@ export function OrdersTable() {
         </div>
       </div>
 
-      <div className="flex gap-2">
-        <Input placeholder="Search order number, client, email…" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-sm" />
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Input placeholder="Search order number, client, email…" value={q} onChange={(e) => setQ(e.target.value)} className="sm:max-w-sm" />
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-          <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[200px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             {ORDER_STATUSES.map((s) => (
               <SelectItem key={s} value={s}>{s === 'all' ? 'All statuses' : titleCase(s)}</SelectItem>

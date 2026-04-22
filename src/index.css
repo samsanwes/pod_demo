@@ -46,6 +46,18 @@
   }
 }
 
+@layer utilities {
+  /* Hide scrollbars on horizontal-scroll containers (tabs strip, tables
+     on mobile) while keeping touch/drag scroll functional. */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;

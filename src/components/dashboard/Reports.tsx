@@ -150,18 +150,18 @@ export function Reports() {
   return (
     <div className="space-y-6">
       {/* --- Controls (hidden in print) --- */}
-      <div className="flex items-start justify-between gap-4 print:hidden">
-        <div>
+      <div className="flex flex-col items-start justify-between gap-4 md:flex-row print:hidden">
+        <div className="min-w-0">
           <h1 className="font-display text-2xl font-bold">Reports</h1>
           <p className="text-sm text-muted-foreground">
             Quick snapshot of order activity, revenue, production load, and turnaround performance.
           </p>
         </div>
-        <div className="flex items-end gap-2">
-          <div className="space-y-1.5">
+        <div className="flex w-full flex-wrap items-end gap-2 md:w-auto">
+          <div className="flex-1 space-y-1.5 sm:flex-none">
             <div className="text-xs text-muted-foreground">Period</div>
             <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-[180px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="day">Today</SelectItem>
                 <SelectItem value="week">This week</SelectItem>
@@ -172,8 +172,8 @@ export function Reports() {
             </Select>
           </div>
           <Button variant="outline" onClick={() => window.print()} aria-label="Print report">
-            <Printer className="mr-2 h-4 w-4" />
-            Print
+            <Printer className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Print</span>
           </Button>
         </div>
       </div>

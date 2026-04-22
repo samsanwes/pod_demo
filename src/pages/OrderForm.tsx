@@ -7,17 +7,17 @@ export function OrderFormPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-white">
-        <div className="container flex items-center justify-between py-4">
-          <Logo />
-          <Link to="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+        <div className="container flex items-center justify-between gap-3 py-4">
+          <Logo className="h-12 md:h-16" />
+          <Link to="/login" className="shrink-0 text-sm font-medium text-muted-foreground hover:text-foreground">
             Staff sign in →
           </Link>
         </div>
       </header>
-      <main className="container py-10">
-        <div className="mx-auto mb-8 max-w-3xl text-center">
-          <h1 className="font-display text-4xl font-bold tracking-tight">Print on Demand</h1>
-          <p className="mt-2 text-muted-foreground">
+      <main className="container py-6 md:py-10">
+        <div className="mx-auto mb-6 max-w-3xl text-center md:mb-8">
+          <h1 className="font-display text-3xl font-bold tracking-tight md:text-4xl">Print on Demand</h1>
+          <p className="mt-2 text-sm text-muted-foreground md:text-base">
             Submit your print project — we'll review it, provide a quote, and be glad to assist with your order.
           </p>
         </div>
