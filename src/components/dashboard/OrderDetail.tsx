@@ -80,9 +80,19 @@ export function OrderDetail() {
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-bold">{order.order_number ?? order.id.slice(0, 8)}</h1>
+          <h1 className="font-display text-2xl font-bold">
+            {order.order_number ?? order.id.slice(0, 8)}
+            {order.title && (
+              <span className="ml-3 text-lg font-normal text-muted-foreground">— {order.title}</span>
+            )}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {order.client_name} · {order.client_organization}
+            {order.order_source !== 'public' && (
+              <span className="ml-2 rounded bg-brand-gold/30 px-2 py-0.5 text-xs font-medium text-brand-foundations">
+                {titleCase(order.order_source)}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

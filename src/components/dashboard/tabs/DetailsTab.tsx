@@ -20,6 +20,8 @@ export function DetailsTab({ order }: { order: OrderRow }) {
       <Card>
         <CardHeader><CardTitle className="text-base">Order</CardTitle></CardHeader>
         <CardContent className="grid gap-1 text-sm">
+          {order.title && <Row k="Title" v={order.title} />}
+          {order.order_source !== 'public' && <Row k="Source" v={titleCase(order.order_source)} />}
           <Row k="Print type" v={order.binding_type === 'other' ? order.binding_type_other ?? '—' : BINDING_LABELS[order.binding_type as BindingType] ?? titleCase(order.binding_type)} />
           <Row k="Quantity" v={String(order.quantity)} />
           <Row k="Delivery by" v={formatDate(order.delivery_date)} />

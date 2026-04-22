@@ -29,12 +29,36 @@ export interface UserRow {
   last_login_at: string | null;
 }
 
+export type OrderSource = 'public' | 'amazon' | 'saiacs_store' | 'whatsapp' | 'direct' | 'other';
+
+export interface Book {
+  id: string;
+  title: string;
+  author: string | null;
+  isbn: string | null;
+  binding_type: BindingType;
+  trim_size: string | null;
+  num_pages: number | null;
+  paper_type: string | null;
+  cover_paper_type: string | null;
+  inner_printing: ColourMode | null;
+  cover_printing: ColourMode | null;
+  cover_lamination: LaminationOption | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface OrderRow {
   id: string;
   order_number: string | null;
   status: OrderStatus;
   created_at: string;
   updated_at: string;
+  book_id: string | null;
+  title: string | null;
+  order_source: OrderSource;
 
   client_email: string;
   client_name: string;

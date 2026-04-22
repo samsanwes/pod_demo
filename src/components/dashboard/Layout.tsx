@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LogOut, Package, CreditCard, Users, Settings, BarChart3 } from 'lucide-react';
+import { LogOut, Package, CreditCard, Users, Settings, BarChart3, BookOpen, PackagePlus } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth';
@@ -16,7 +16,9 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/dashboard/orders', label: 'Orders', icon: <Package className="h-4 w-4" />, roles: ['manager', 'production', 'bookstore'] },
+  { to: '/dashboard/new-order', label: 'Place order', icon: <PackagePlus className="h-4 w-4" />, roles: ['manager', 'bookstore'] },
   { to: '/dashboard/reports', label: 'Reports', icon: <BarChart3 className="h-4 w-4" />, roles: ['manager'] },
+  { to: '/dashboard/books', label: 'Books', icon: <BookOpen className="h-4 w-4" />, roles: ['manager'] },
   { to: '/dashboard/rate-card', label: 'Rate card', icon: <CreditCard className="h-4 w-4" />, roles: ['manager'] },
   { to: '/dashboard/users', label: 'Users', icon: <Users className="h-4 w-4" />, roles: ['manager'] },
   { to: '/dashboard/settings', label: 'Settings', icon: <Settings className="h-4 w-4" />, roles: ['manager'] },

@@ -114,8 +114,17 @@ export function OrdersTable() {
                   </Link>
                 </TableCell>
                 <TableCell>
-                  <div className="font-medium">{o.client_name}</div>
-                  <div className="text-xs text-muted-foreground">{o.client_organization}</div>
+                  {o.title ? (
+                    <>
+                      <div className="font-medium">{o.title}</div>
+                      <div className="text-xs text-muted-foreground">{titleCase(o.order_source)}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-medium">{o.client_name}</div>
+                      <div className="text-xs text-muted-foreground">{o.client_organization}</div>
+                    </>
+                  )}
                 </TableCell>
                 <TableCell>{titleCase(o.binding_type)}</TableCell>
                 <TableCell>{o.quantity}</TableCell>

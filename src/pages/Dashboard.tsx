@@ -5,6 +5,8 @@ import { OrderDetail } from '@/components/dashboard/OrderDetail';
 import { RateCardAdmin } from '@/components/pricing/RateCardAdmin';
 import { UsersAdmin } from '@/components/dashboard/UsersAdmin';
 import { Reports } from '@/components/dashboard/Reports';
+import { BooksAdmin } from '@/components/dashboard/BooksAdmin';
+import { NewInternalOrder } from '@/components/dashboard/NewInternalOrder';
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
 
 export function DashboardPage() {
@@ -15,10 +17,26 @@ export function DashboardPage() {
         <Route path="orders" element={<OrdersTable />} />
         <Route path="orders/:id" element={<OrderDetail />} />
         <Route
+          path="new-order"
+          element={
+            <ProtectedRoute requiredRoles={['manager', 'bookstore']}>
+              <NewInternalOrder />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="reports"
           element={
             <ProtectedRoute requiredRoles={['manager']}>
               <Reports />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="books"
+          element={
+            <ProtectedRoute requiredRoles={['manager']}>
+              <BooksAdmin />
             </ProtectedRoute>
           }
         />
