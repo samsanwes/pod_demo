@@ -43,7 +43,7 @@ export function DashboardPage() {
         <Route
           path="rate-card"
           element={
-            <ProtectedRoute requiredRoles={['manager']}>
+            <ProtectedRoute requiredRoles={['manager', 'production']}>
               <RateCardAdmin />
             </ProtectedRoute>
           }
