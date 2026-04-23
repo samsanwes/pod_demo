@@ -36,8 +36,9 @@ function matchesTab(tab: QueueTab, o: OrderRow): boolean {
         || o.production_status === 'sample_approval'
       );
     case 'production':
-      // Production phase: confirmed + actively producing + the "sample_approved"
-      // handoff state where production is ready to start the full run.
+      // Production phase. Exclude `sample_approval` (ball is with the manager
+      // waiting on client sign-off); keep `sample_approved` in here since the
+      // production person needs to see it to kick off the full run.
       return (
         ['confirmed', 'in_production'].includes(o.status)
         && o.production_status !== 'sample_approval'
@@ -192,7 +193,10 @@ export function OrdersTable() {
                   <div className="flex items-center gap-2">
                     <StatusBadge status={o.status} />
                     {o.production_status === 'sample_approval' && (
-                      <Badge variant="gold" title="Awaiting sample approval (manager)">Sample</Badge>
+                      <Badge variant="gold" title="Awaiting manager's sample approval">Sample pending</Badge>
+                    )}
+                    {o.production_status === 'sample_approved' && (
+                      <Badge variant="success" title="Sample approved — production to start full run">Sample approved</Badge>
                     )}
                     {o.production_status === 'sample_approved' && (
                       <Badge variant="success" title="Sample approved — production can start full run">Approved</Badge>
