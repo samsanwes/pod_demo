@@ -180,7 +180,7 @@ export interface PrinterRate {
   printer_name: string;
   colour_mode: ColourMode;
   paper_size: string;
-  price_per_sheet: number;
+  price_per_page: number;
   alt_price: number | null;
   is_active: boolean;
   updated_at: string;

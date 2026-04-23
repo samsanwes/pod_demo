@@ -40,7 +40,7 @@ const SCHEMAS: Record<TableName, { label: string; columns: ColumnDef[] }> = {
       { key: 'printer_name', label: 'Printer', required: true },
       { key: 'colour_mode', label: 'Mode', type: 'select', options: ['bw', 'colour'], required: true },
       { key: 'paper_size', label: 'Size', required: true },
-      { key: 'price_per_sheet', label: 'Price / sheet', type: 'number', step: 0.01, required: true },
+      { key: 'price_per_page', label: 'Price / page', type: 'number', step: 0.01, required: true },
       { key: 'alt_price', label: 'Alt price', type: 'number', step: 0.01 },
     ],
   },

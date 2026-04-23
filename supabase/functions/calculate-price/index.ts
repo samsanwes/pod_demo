@@ -87,7 +87,7 @@ serve(async (req) => {
     ]);
 
     const papers = (papersRes.data ?? []) as Array<{ name: string; gsm: number; usage: string; price_per_sheet: number }>;
-    const printers = (printersRes.data ?? []) as Array<{ colour_mode: string; paper_size: string; price_per_sheet: number }>;
+    const printers = (printersRes.data ?? []) as Array<{ colour_mode: string; paper_size: string; price_per_page: number }>;
     const lams = (lamRes.data ?? []) as Array<{ name: string; roll_price: number }>;
     const allOverheads = (overheadRes.data ?? []) as Array<{ name: string; cost_per_copy: number; binding_type: string | null }>;
     const imposs = (imposRes.data ?? []) as Array<{ trim_size: string; printer_paper_size: string; pages_per_sheet: number }>;
@@ -118,15 +118,18 @@ serve(async (req) => {
       const coverPaper = matchPaper(papers, coverPref, 'cover');
       if (coverPaper) components.paper_cover = coverPaper.price_per_sheet;
 
+      // Printer rates are per-page now. Inner = one impression per text page.
+      // Cover = 2 printed pages (outer front + outer back); assumes inside
+      // covers are blank — edit the rate card if that's not true for a title.
       const innerPrint = printers.find(
         (p) => p.colour_mode === (order.inner_printing ?? 'bw') && p.paper_size === printerPaperSize
       );
-      if (innerPrint) components.print_text = sheetsPerCopy * innerPrint.price_per_sheet;
+      if (innerPrint) components.print_text = pages * innerPrint.price_per_page;
 
       const coverPrint = printers.find(
         (p) => p.colour_mode === (order.cover_printing ?? 'colour') && p.paper_size === printerPaperSize
       );
-      if (coverPrint) components.print_cover = coverPrint.price_per_sheet;
+      if (coverPrint) components.print_cover = 2 * coverPrint.price_per_page;
 
       if (order.cover_lamination && order.cover_lamination !== 'none') {
         const lam = lams.find((l) => l.name.toLowerCase() === order.cover_lamination);
@@ -139,9 +142,12 @@ serve(async (req) => {
       }
     } else {
       // --- Non-book print jobs ---
+      // Paper is still charged per sheet (double-sided halves the sheet count);
+      // printing is charged per page impression.
+      const pages = order.num_pages ?? 1;
       const sheetsPerCopy = order.printing_sides === 'double'
-        ? Math.ceil((order.num_pages ?? 1) / 2)
-        : order.num_pages ?? 1;
+        ? Math.ceil(pages / 2)
+        : pages;
       const size = order.paper_size ?? 'A4';
 
       const paper = papers.find((p) => p.usage === 'text') ?? papers[0];
@@ -149,7 +155,7 @@ serve(async (req) => {
 
       for (const mode of order.printing_type ?? ['bw']) {
         const p = printers.find((r) => r.colour_mode === mode && r.paper_size === size);
-        if (p) components[`print_${mode}`] = sheetsPerCopy * p.price_per_sheet;
+        if (p) components[`print_${mode}`] = pages * p.price_per_page;
       }
 
       if (['wiro', 'comb'].includes(order.binding_type) &&

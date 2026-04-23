@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Mail } from 'lucide-react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft, Mail, Trash2, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { OrderRow, OrderStatus } from '@/lib/database.types';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { EmailTemplateDialog } from '@/components/shared/EmailTemplateDialog';
 import { DetailsTab } from './tabs/DetailsTab';
@@ -30,9 +33,11 @@ const MANAGER_NEXT_STATUSES: OrderStatus[] = [
 
 export function OrderDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [order, setOrder] = useState<OrderRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [emailOpen, setEmailOpen] = useState<EmailTemplateId | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const { role } = useAuth();
 
   useEffect(() => {
@@ -125,6 +130,16 @@ export function OrderDetail() {
               {EMAIL_TEMPLATE_LABELS[t]}
             </Button>
           ))}
+          <div className="flex-1" />
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            Delete order
+          </Button>
         </div>
       )}
 
@@ -161,6 +176,76 @@ export function OrderDetail() {
           onOpenChange={(o) => { if (!o) setEmailOpen(null); }}
         />
       )}
+
+      {deleteOpen && (
+        <DeleteOrderDialog
+          order={order}
+          onClose={(deleted) => {
+            setDeleteOpen(false);
+            if (deleted) navigate('/dashboard/orders', { replace: true });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function DeleteOrderDialog({ order, onClose }: { order: OrderRow; onClose: (deleted: boolean) => void }) {
+  const ref = order.order_number ?? order.id.slice(0, 8);
+  const [confirmText, setConfirmText] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const canConfirm = confirmText === ref && !busy;
+
+  async function remove() {
+    setBusy(true);
+    try {
+      // RLS permits DELETE for manager role only (migration 0007). The row's
+      // FK children (order_files, order_status_log, order_holds) cascade via
+      // ON DELETE CASCADE set up in earlier migrations.
+      const { error } = await supabase.from('orders').delete().eq('id', order.id);
+      if (error) throw error;
+      toast({ title: 'Order deleted', description: `${ref} permanently removed.` });
+      onClose(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast({ variant: 'destructive', title: 'Delete failed', description: msg });
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose(false)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete order {ref}</DialogTitle>
+          <DialogDescription>
+            Permanently removes the order row, its uploaded files, audit log entries, and hold history.
+            {' '}Prefer <strong>Cancelled</strong> status instead if you need to keep a record. This action
+            can't be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>
+              Type <code className="rounded bg-muted px-1 text-xs">{ref}</code> to confirm
+            </Label>
+            <Input
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder={ref}
+              autoFocus
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onClose(false)}>Cancel</Button>
+          <Button variant="destructive" onClick={remove} disabled={!canConfirm}>
+            {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+            Delete permanently
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
