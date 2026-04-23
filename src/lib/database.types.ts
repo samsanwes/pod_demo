@@ -8,7 +8,7 @@ export type OrderStatus =
 
 export type ProductionStatus =
   | 'not_started' | 'started' | 'in_progress'
-  | 'sample_approval' | 'full_production' | 'completed';
+  | 'sample_approval' | 'sample_approved' | 'full_production' | 'completed';
 
 export type BindingType = 'perfect' | 'saddle' | 'wiro' | 'comb' | 'document' | 'other';
 export type DeliveryMethod = 'pickup' | 'courier';

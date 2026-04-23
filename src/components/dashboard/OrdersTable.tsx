@@ -29,12 +29,19 @@ const TAB_DEFS: Array<{ id: QueueTab; label: string; help: string }> = [
 function matchesTab(tab: QueueTab, o: OrderRow): boolean {
   switch (tab) {
     case 'attention':
+      // Manager needs to act when: a new order arrives, needs review/quote,
+      // or production has pulled a sample and is waiting for client sign-off.
       return (
         ['new', 'under_review', 'quoted'].includes(o.status)
         || o.production_status === 'sample_approval'
       );
     case 'production':
-      return ['confirmed', 'in_production'].includes(o.status) && o.production_status !== 'sample_approval';
+      // Production phase: confirmed + actively producing + the "sample_approved"
+      // handoff state where production is ready to start the full run.
+      return (
+        ['confirmed', 'in_production'].includes(o.status)
+        && o.production_status !== 'sample_approval'
+      );
     case 'ready':
       return ['ready', 'shipped', 'picked_up'].includes(o.status);
     case 'done':
@@ -185,7 +192,10 @@ export function OrdersTable() {
                   <div className="flex items-center gap-2">
                     <StatusBadge status={o.status} />
                     {o.production_status === 'sample_approval' && (
-                      <Badge variant="gold" title="Awaiting sample approval">Sample</Badge>
+                      <Badge variant="gold" title="Awaiting sample approval (manager)">Sample</Badge>
+                    )}
+                    {o.production_status === 'sample_approved' && (
+                      <Badge variant="success" title="Sample approved — production can start full run">Approved</Badge>
                     )}
                     {o.is_on_hold && <Badge variant="tangerine">Hold</Badge>}
                   </div>

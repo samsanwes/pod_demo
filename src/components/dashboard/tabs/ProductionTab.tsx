@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, Pause, Play, CheckCircle2, Clock } from 'lucide-react';
+import { Loader2, Pause, Play, CheckCircle2, Clock, Rocket } from 'lucide-react';
 import type { OrderRow, ProductionStatus } from '@/lib/database.types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,9 +12,14 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { toast } from '@/hooks/use-toast';
 
-// Production selects from the sub-statuses up to and including 'sample_approval'.
-// Once at 'sample_approval' they're blocked — only the manager can advance
-// to 'full_production' via the "Approve sample" button.
+// Production progresses through:
+//   not_started → in_progress → sample_approval → (manager) → sample_approved →
+//   (production kicks off) → full_production → completed.
+//
+// Dropdown exposes only the production-driven transitions. "sample_approved"
+// is set by the manager via the "Approve sample" button — production never
+// picks it from the dropdown. Instead, when an order is in sample_approved,
+// production sees a prominent "Start full production" button.
 // "started" was collapsed into "in_progress" — kept out of the UI to simplify.
 const PROD_STATUSES_FOR_PRODUCTION: ProductionStatus[] = [
   'not_started', 'in_progress', 'sample_approval', 'full_production', 'completed',
@@ -32,6 +37,7 @@ export function ProductionTab({ order, onUpdated }: Props) {
   const [nextProd, setNextProd] = useState<ProductionStatus>(order.production_status ?? 'not_started');
 
   const isAwaitingSampleApproval = order.production_status === 'sample_approval';
+  const isSampleApproved = order.production_status === 'sample_approved';
   const isManager = role === 'manager';
   const isProduction = role === 'production';
 
@@ -39,8 +45,9 @@ export function ProductionTab({ order, onUpdated }: Props) {
   const prodAllowedNext: ProductionStatus[] = isManager
     ? PROD_STATUSES_FOR_PRODUCTION
     : ['not_started', 'in_progress', 'sample_approval', 'completed'];
-  // If production already requested sample approval, they shouldn't advance anywhere until manager OK's.
-  const productionIsBlocked = isProduction && isAwaitingSampleApproval;
+  // Production is blocked from self-advancing while the sample is in flight
+  // (either waiting for manager approval, or approved but not yet picked up).
+  const productionIsBlocked = isProduction && (isAwaitingSampleApproval || isSampleApproved);
 
   const canEdit = (isManager || isProduction) && !productionIsBlocked;
   const canEditStatus = canEdit && !order.is_on_hold && ['confirmed', 'in_production', 'ready'].includes(order.status);
@@ -72,8 +79,13 @@ export function ProductionTab({ order, onUpdated }: Props) {
   }
 
   async function approveSample() {
+    await updateOrder({ production_status: 'sample_approved' });
+    toast({ title: 'Sample approved', description: 'Production will see this and start the full run.' });
+  }
+
+  async function startFullProduction() {
     await updateOrder({ production_status: 'full_production' });
-    toast({ title: 'Sample approved', description: 'Production can now resume.' });
+    toast({ title: 'Full production started' });
   }
 
   async function placeHold() {
@@ -120,7 +132,7 @@ export function ProductionTab({ order, onUpdated }: Props) {
 
   return (
     <div className="grid gap-4">
-      {/* Sample-approval gate */}
+      {/* Sample approval gate — waiting on the manager */}
       {isAwaitingSampleApproval && (
         <Card className="border-brand-gold/50 bg-brand-gold/10">
           <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
@@ -130,8 +142,8 @@ export function ProductionTab({ order, onUpdated }: Props) {
                 <div className="font-semibold text-brand-foundations">Awaiting sample approval</div>
                 <div className="text-sm text-muted-foreground">
                   {isManager
-                    ? 'Production has reached the sample approval stage. Share the sample with the client, then click Approve to resume production.'
-                    : 'Manager will check the sample with the client before you continue. You\'ll see the status change when they approve.'}
+                    ? 'Production has reached the sample approval stage. Share the sample with the client, then click Approve once they sign off.'
+                    : 'Manager will check the sample with the client. You\'ll see the status change when they approve.'}
                 </div>
               </div>
             </div>
@@ -139,6 +151,31 @@ export function ProductionTab({ order, onUpdated }: Props) {
               <Button onClick={approveSample} disabled={busy} className="shrink-0">
                 {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
                 Approve sample
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Sample approved — waiting on production to kick off the full run */}
+      {isSampleApproved && (
+        <Card className="border-emerald-400/50 bg-emerald-50">
+          <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
+              <div>
+                <div className="font-semibold text-emerald-900">Sample approved</div>
+                <div className="text-sm text-muted-foreground">
+                  {isProduction
+                    ? 'The client signed off on the sample. Click to start the full production run whenever you\'re ready.'
+                    : 'Production has been notified. They will start the full run when they pick this up.'}
+                </div>
+              </div>
+            </div>
+            {(isProduction || isManager) && (
+              <Button onClick={startFullProduction} disabled={busy} className="shrink-0">
+                {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}
+                Start full production
               </Button>
             )}
           </CardContent>
