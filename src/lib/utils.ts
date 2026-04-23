@@ -34,3 +34,28 @@ export function formatDateTime(s: string | null | undefined): string {
 export function titleCase(s: string): string {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+const ORDER_SOURCE_LABELS: Record<string, string> = {
+  public: 'POD Form',
+  amazon: 'Amazon',
+  online_store: 'Online Store',
+  book_store: 'Book Store',
+  whatsapp: 'WhatsApp',
+  other: 'Other',
+  // Legacy values — shown with nicer labels so old orders read cleanly.
+  saiacs_store: 'Online Store',
+  direct: 'Book Store',
+};
+
+/** Friendly label for an order_source value, with optional free-text "Other" note. */
+export function formatOrderSource(
+  source: string | null | undefined,
+  otherText?: string | null,
+): string {
+  if (!source) return '—';
+  const base = ORDER_SOURCE_LABELS[source] ?? titleCase(source);
+  if (source === 'other' && otherText && otherText.trim().length > 0) {
+    return `${base} — ${otherText.trim()}`;
+  }
+  return base;
+}

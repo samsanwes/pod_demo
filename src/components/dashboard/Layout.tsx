@@ -18,9 +18,9 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: '/dashboard/orders', label: 'Orders', icon: <Package className="h-4 w-4" />, roles: ['manager', 'production', 'bookstore'] },
-  { to: '/dashboard/new-order', label: 'Place order', icon: <PackagePlus className="h-4 w-4" />, roles: ['manager', 'bookstore'] },
+  { to: '/dashboard/new-order', label: 'Place order', icon: <PackagePlus className="h-4 w-4" />, roles: ['manager', 'bookstore', 'production'] },
+  { to: '/dashboard/books', label: 'Books / Resources', icon: <BookOpen className="h-4 w-4" />, roles: ['manager', 'production'] },
   { to: '/dashboard/reports', label: 'Reports', icon: <BarChart3 className="h-4 w-4" />, roles: ['manager'] },
-  { to: '/dashboard/books', label: 'Books', icon: <BookOpen className="h-4 w-4" />, roles: ['manager'] },
   { to: '/dashboard/rate-card', label: 'Rate card', icon: <CreditCard className="h-4 w-4" />, roles: ['manager'] },
   { to: '/dashboard/users', label: 'Users', icon: <Users className="h-4 w-4" />, roles: ['manager'] },
   { to: '/dashboard/settings', label: 'Settings', icon: <Settings className="h-4 w-4" />, roles: ['manager'] },

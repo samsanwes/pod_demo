@@ -16,9 +16,9 @@ import { titleCase } from '@/lib/utils';
 
 const SOURCE_OPTIONS: { value: OrderSource; label: string }[] = [
   { value: 'amazon', label: 'Amazon' },
-  { value: 'saiacs_store', label: 'SAIACS Store' },
+  { value: 'online_store', label: 'Online Store' },
+  { value: 'book_store', label: 'Book Store' },
   { value: 'whatsapp', label: 'WhatsApp' },
-  { value: 'direct', label: 'Direct' },
   { value: 'other', label: 'Other' },
 ];
 
@@ -31,6 +31,7 @@ export function NewInternalOrder() {
 
   const [bookId, setBookId] = useState<string>('');
   const [source, setSource] = useState<OrderSource>('amazon');
+  const [sourceOther, setSourceOther] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(50);
   const [deliveryDate, setDeliveryDate] = useState<string>(() => {
     const d = new Date();
@@ -64,23 +65,33 @@ export function NewInternalOrder() {
       toast({ variant: 'destructive', title: 'Quantity must be ≥ 1' });
       return;
     }
+    if (source === 'other' && !sourceOther.trim()) {
+      toast({ variant: 'destructive', title: 'Specify source', description: 'Please describe the "Other" source.' });
+      return;
+    }
     setSubmitting(true);
     try {
       const orderId = crypto.randomUUID();
       const payload = {
         id: orderId,
-        status: 'confirmed' as const, // internal orders skip the quote/confirm flow
+        // Production queue entry point — goes straight to "sample approved"
+        // so the production user sees the green banner and clicks
+        // "Start full production" to begin. No client sample review needed
+        // for internal reprints.
+        status: 'in_production' as const,
+        production_status: 'sample_approved' as const,
         order_source: source,
+        order_source_other: source === 'other' ? sourceOther.trim() : null,
         book_id: selectedBook.id,
         title: selectedBook.title,
 
-        // Client placeholder — this is the bookstore acting as "client"
-        client_name: 'SAIACS Bookstore',
+        // Internal "client" = the bookstore acting as requester
+        client_name: profile?.name ?? 'SAIACS Bookstore',
         client_email: profile?.email ?? 'bookstore@saiacs.org',
         client_phone: 'Internal',
         client_organization: 'SAIACS Bookstore',
 
-        // Snapshot the book spec at order time
+        // Spec snapshot from catalog
         binding_type: selectedBook.binding_type,
         trim_size: selectedBook.trim_size,
         num_pages: selectedBook.num_pages,
@@ -92,26 +103,37 @@ export function NewInternalOrder() {
 
         quantity,
         delivery_date: deliveryDate,
-        delivery_method: 'pickup' as const, // campus handover
+        delivery_method: 'pickup' as const,
         special_instructions: notes.trim() || null,
       };
 
       const { error: insertErr } = await supabase.from('orders').insert(payload);
       if (insertErr) throw insertErr;
 
-      // Assign POD-YYYY-NNNN via the edge function. Non-fatal if it's slow —
-      // the order is already in the queue.
-      let orderNumber = orderId.slice(0, 8);
-      try {
-        const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000));
-        const call = supabase.functions.invoke('generate-order-number', { body: { order_id: orderId } });
-        const { data } = (await Promise.race([call, timeout])) as { data: { order_number?: string } };
-        if (data?.order_number) orderNumber = data.order_number;
-      } catch (err) {
-        console.warn('[new-internal-order] generate-order-number failed', err);
-      }
+      // Kick off in parallel: order-number assignment + price calculation.
+      // Both are non-fatal — if either fails, order still exists.
+      const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+        Promise.race([
+          p,
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms)),
+        ]);
 
-      toast({ title: 'Order placed', description: `${orderNumber} queued for production.` });
+      let orderNumber = orderId.slice(0, 8);
+      await Promise.allSettled([
+        withTimeout(
+          supabase.functions.invoke('generate-order-number', { body: { order_id: orderId } }),
+          8000,
+        ).then((r) => {
+          const data = (r as { data: { order_number?: string } }).data;
+          if (data?.order_number) orderNumber = data.order_number;
+        }).catch((err) => console.warn('[new-internal-order] generate-order-number failed', err)),
+        withTimeout(
+          supabase.functions.invoke('calculate-price', { body: { order_id: orderId } }),
+          10000,
+        ).catch((err) => console.warn('[new-internal-order] calculate-price failed', err)),
+      ]);
+
+      toast({ title: 'Order placed', description: `${orderNumber} — production can now start the full run.` });
       navigate(`/dashboard/orders/${orderId}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -125,11 +147,11 @@ export function NewInternalOrder() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-2xl font-bold">Place bookstore order</h1>
+        <h1 className="font-display text-2xl font-bold">Place order</h1>
         <p className="text-sm text-muted-foreground">
-          For reprints originating from Amazon, SAIACS Store, WhatsApp, or walk-ins. Pick a book
-          from the catalog — the print spec comes from the catalog entry so production knows what
-          to run.
+          For reprints originating from Amazon, the Online Store, Book Store, WhatsApp, or other
+          channels. Pick a book from the catalog — the print spec comes from the catalog entry so
+          production knows what to run. The order lands in production's queue immediately.
         </p>
       </div>
 
@@ -147,7 +169,7 @@ export function NewInternalOrder() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5 md:col-span-2">
-              <Label>Book</Label>
+              <Label>Book / Resource</Label>
               <Select value={bookId} onValueChange={setBookId} disabled={loadingBooks || books.length === 0}>
                 <SelectTrigger><SelectValue placeholder="Pick a title from the catalog…" /></SelectTrigger>
                 <SelectContent>
@@ -169,6 +191,17 @@ export function NewInternalOrder() {
                 </SelectContent>
               </Select>
             </div>
+
+            {source === 'other' && (
+              <div className="space-y-1.5">
+                <Label>Specify source</Label>
+                <Input
+                  value={sourceOther}
+                  onChange={(e) => setSourceOther(e.target.value)}
+                  placeholder="e.g. Church bookstall, conference"
+                />
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <Label>Quantity</Label>
@@ -193,8 +226,8 @@ export function NewInternalOrder() {
           <CardHeader>
             <CardTitle className="text-base">Spec preview — {selectedBook.title}</CardTitle>
             <CardDescription>
-              This is what production will receive. Make sure the files on record still match this spec
-              before printing. Contact the manager if the title needs a spec change.
+              This is what production will receive. Make sure the files on record still match this
+              spec before printing. Contact the manager if the title needs a spec change.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-2 text-sm md:grid-cols-2">

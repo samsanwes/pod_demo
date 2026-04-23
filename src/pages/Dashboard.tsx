@@ -19,7 +19,7 @@ export function DashboardPage() {
         <Route
           path="new-order"
           element={
-            <ProtectedRoute requiredRoles={['manager', 'bookstore']}>
+            <ProtectedRoute requiredRoles={['manager', 'bookstore', 'production']}>
               <NewInternalOrder />
             </ProtectedRoute>
           }
@@ -35,7 +35,7 @@ export function DashboardPage() {
         <Route
           path="books"
           element={
-            <ProtectedRoute requiredRoles={['manager']}>
+            <ProtectedRoute requiredRoles={['manager', 'production']}>
               <BooksAdmin />
             </ProtectedRoute>
           }

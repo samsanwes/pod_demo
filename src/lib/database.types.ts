@@ -29,7 +29,9 @@ export interface UserRow {
   last_login_at: string | null;
 }
 
-export type OrderSource = 'public' | 'amazon' | 'saiacs_store' | 'whatsapp' | 'direct' | 'other';
+export type OrderSource = 'public' | 'amazon' | 'online_store' | 'book_store' | 'whatsapp' | 'other'
+  // Legacy values kept so old rows still parse cleanly:
+  | 'saiacs_store' | 'direct';
 
 export interface Book {
   id: string;
@@ -59,6 +61,7 @@ export interface OrderRow {
   book_id: string | null;
   title: string | null;
   order_source: OrderSource;
+  order_source_other: string | null;
 
   client_email: string;
   client_name: string;

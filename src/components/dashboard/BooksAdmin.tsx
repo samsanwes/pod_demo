@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { Book, BindingType, ColourMode, LaminationOption } from '@/lib/database.types';
+import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,9 @@ const EMPTY_BOOK: Omit<Book, 'id' | 'created_at' | 'updated_at'> = {
 };
 
 export function BooksAdmin() {
+  const { role } = useAuth();
+  const canEdit = role === 'manager';
+
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Book | null>(null);
@@ -62,13 +66,16 @@ export function BooksAdmin() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-2xl font-bold">Books catalog</h1>
+          <h1 className="font-display text-2xl font-bold">Books / Resources</h1>
           <p className="text-sm text-muted-foreground">
-            Titles the bookstore team can re-order. Each entry stores the print spec so every reprint
-            comes out identically. Production files are kept separately.
+            Titles available for reprint. Each entry stores the print spec so every
+            reprint comes out identically. Production files are kept separately.
+            {!canEdit && ' (Read-only — contact the manager to edit the catalog.)'}
           </p>
         </div>
-        <Button onClick={() => setCreating(true)}><Plus className="mr-1 h-4 w-4" />Add book</Button>
+        {canEdit && (
+          <Button onClick={() => setCreating(true)}><Plus className="mr-1 h-4 w-4" />Add book</Button>
+        )}
       </div>
 
       <Card>
@@ -88,7 +95,7 @@ export function BooksAdmin() {
             <TableBody>
               {loading && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Loading…</TableCell></TableRow>}
               {!loading && books.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No books yet. Add one to let the bookstore team place orders.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No books yet.{canEdit ? ' Add one to let the bookstore team place orders.' : ''}</TableCell></TableRow>
               )}
               {books.map((b) => (
                 <TableRow key={b.id}>
@@ -102,15 +109,19 @@ export function BooksAdmin() {
                   </TableCell>
                   <TableCell>{b.is_active ? <Badge variant="success">Active</Badge> : <Badge variant="muted">Inactive</Badge>}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => setEditing(b)}>Edit</Button>
-                      <Button size="sm" variant="ghost" onClick={() => toggleActive(b)}>
-                        {b.is_active ? 'Disable' : 'Enable'}
-                      </Button>
-                      <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => remove(b)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {canEdit ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => setEditing(b)}>Edit</Button>
+                        <Button size="sm" variant="ghost" onClick={() => toggleActive(b)}>
+                          {b.is_active ? 'Disable' : 'Enable'}
+                        </Button>
+                        <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => remove(b)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -119,7 +130,7 @@ export function BooksAdmin() {
         </CardContent>
       </Card>
 
-      {(editing || creating) && (
+      {canEdit && (editing || creating) && (
         <BookDialog
           initial={editing ?? null}
           onClose={(saved) => { setEditing(null); setCreating(false); if (saved) reload(); }}

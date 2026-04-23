@@ -55,7 +55,9 @@ serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Enforce caller is authenticated manager
+    // Enforce caller is an active staff member (any role).
+    // Pricing is also invoked automatically on internal reprints placed by
+    // bookstore/production — hence not restricted to managers.
     const authHeader = req.headers.get('Authorization') ?? '';
     const jwt = authHeader.replace(/^Bearer\s+/i, '');
     if (jwt) {
@@ -64,8 +66,8 @@ serve(async (req) => {
       if (!uid) return json({ error: 'Unauthorized' }, 401);
       const { data: row } = await admin.from('users').select('role,is_active').eq('id', uid).single();
       const profile = row as { role?: string; is_active?: boolean } | null;
-      if (!profile?.is_active || profile?.role !== 'manager') {
-        return json({ error: 'Manager role required' }, 403);
+      if (!profile?.is_active || !['manager', 'bookstore', 'production'].includes(profile?.role ?? '')) {
+        return json({ error: 'Active staff role required' }, 403);
       }
     }
 
