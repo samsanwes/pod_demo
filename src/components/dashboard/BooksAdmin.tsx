@@ -34,7 +34,7 @@ const EMPTY_BOOK: Omit<Book, 'id' | 'created_at' | 'updated_at'> = {
 
 export function BooksAdmin() {
   const { role } = useAuth();
-  const canEdit = role === 'manager';
+  const canEdit = role === 'manager' || role === 'production';
 
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +70,7 @@ export function BooksAdmin() {
           <p className="text-sm text-muted-foreground">
             Titles available for reprint. Each entry stores the print spec so every
             reprint comes out identically. Production files are kept separately.
-            {!canEdit && ' (Read-only — contact the manager to edit the catalog.)'}
+            {!canEdit && ' (Read-only — contact the manager or production to edit the catalog.)'}
           </p>
         </div>
         {canEdit && (
