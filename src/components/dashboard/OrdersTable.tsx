@@ -87,8 +87,11 @@ export function OrdersTable() {
   }), [orders]);
 
   const filtered = useMemo(() => {
+    // Tab filter is a manager-only UI — production and bookstore don't see the
+    // tabs, so they shouldn't have it silently applied either.
+    const applyTab = role === 'manager';
     return orders.filter((o) => {
-      if (!matchesTab(tab, o)) return false;
+      if (applyTab && !matchesTab(tab, o)) return false;
       if (statusFilter !== 'all' && o.status !== statusFilter) return false;
       if (!q) return true;
       const needle = q.toLowerCase();
