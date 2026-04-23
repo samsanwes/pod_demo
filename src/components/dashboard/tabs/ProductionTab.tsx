@@ -15,8 +15,9 @@ import { toast } from '@/hooks/use-toast';
 // Production selects from the sub-statuses up to and including 'sample_approval'.
 // Once at 'sample_approval' they're blocked — only the manager can advance
 // to 'full_production' via the "Approve sample" button.
+// "started" was collapsed into "in_progress" — kept out of the UI to simplify.
 const PROD_STATUSES_FOR_PRODUCTION: ProductionStatus[] = [
-  'not_started', 'started', 'in_progress', 'sample_approval', 'full_production', 'completed',
+  'not_started', 'in_progress', 'sample_approval', 'full_production', 'completed',
 ];
 
 interface Props {
@@ -37,7 +38,7 @@ export function ProductionTab({ order, onUpdated }: Props) {
   // Production can only self-advance up to sample_approval. After that, manager must approve.
   const prodAllowedNext: ProductionStatus[] = isManager
     ? PROD_STATUSES_FOR_PRODUCTION
-    : ['not_started', 'started', 'in_progress', 'sample_approval', 'completed'];
+    : ['not_started', 'in_progress', 'sample_approval', 'completed'];
   // If production already requested sample approval, they shouldn't advance anywhere until manager OK's.
   const productionIsBlocked = isProduction && isAwaitingSampleApproval;
 
